@@ -1,0 +1,213 @@
+# アクセスログトラッキングシステム ドキュメント
+
+## 概要
+
+Access Log Tracker (ALT) は、複数のWebアプリケーションから利用される汎用アクセスログトラッキングシステムです。
+トラッキング用ビーコンの生成・管理とデータ書き込み機能に特化し、月間2000万PVの大規模トラフィックに対応します。
+
+## 技術スタック
+
+- **バックエンド**: Go + Gin Framework
+- **Webサーバー**: Nginx + OpenResty (Lua)
+- **データベース**: PostgreSQL 14+（月別パーティショニング）
+- **フロントエンド**: Vanilla JavaScript（軽量トラッキングビーコン）
+- **開発環境**: Docker + Docker Compose
+- **本番環境**: AWS (ALB + EC2 + Nginx + Go + RDS PostgreSQL)
+
+## ドキュメント構成
+
+### 1. [システム概要](./01-overview.md)
+- プロジェクト概要と目的
+- システム要件（機能・非機能）
+- 想定利用規模
+- システム構成とアーキテクチャ
+- データモデル概要
+- セキュリティ考慮事項
+- パフォーマンス要件
+
+### 2. [API仕様書](./02-api-specification.md)
+- RESTful API設計
+- エンドポイント詳細
+- 認証方式（API Key）
+- レート制限
+- エラーコード
+- バッチ処理
+- Webhook機能
+
+### 3. [トラッキングビーコン仕様書](./03-tracking-beacon.md)
+- JavaScriptビーコン設計
+- 実装仕様
+- セキュリティ対策
+- パフォーマンス最適化
+- カスタマイズ機能
+- ブラウザ対応
+- エラー処理
+
+### 4. [データベース設計仕様書](./04-database-design.md)
+- PostgreSQL設計
+- テーブル構造
+- パーティショニング戦略
+- インデックス設計
+- データ型と制約
+- バックアップ戦略
+- パフォーマンス最適化
+
+### 5. [デプロイメントガイド](./05-deployment-guide.md)
+- 開発環境セットアップ
+- Docker Compose設定
+- AWS本番環境
+- CI/CDパイプライン
+- 監視とログ
+- バックアップと復旧
+- セキュリティ設定
+
+### 6. [テスト戦略仕様書](./06-testing-strategy.md)
+- テスト方針とレベル
+- テスト環境構成
+- 単体テスト
+- 統合テスト
+- E2Eテスト
+- パフォーマンステスト
+- セキュリティテスト
+
+## クイックスタート
+
+### 1. 環境セットアップ
+```bash
+# リポジトリクローン
+git clone <repository-url>
+cd access-log-tracker
+
+# Go環境セットアップ
+go mod init access-log-tracker
+go mod tidy
+
+# 環境変数設定
+cp .env.example .env
+# .envファイルを編集
+
+# データベースマイグレーション
+go run cmd/migrate/main.go
+
+# 開発サーバー起動
+go run cmd/server/main.go
+```
+
+### 2. トラッキングビーコン実装
+```html
+<!-- 基本実装 -->
+<script>
+(function() {
+    var script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://cdn.access-log-tracker.com/tracker.js';
+    script.setAttribute('data-app-id', 'YOUR_APP_ID');
+    var firstScript = document.getElementsByTagName('script')[0];
+    firstScript.parentNode.insertBefore(script, firstScript);
+})();
+</script>
+```
+
+### 3. API使用例
+```javascript
+// トラッキングデータ送信
+const response = await fetch('https://api.access-log-tracker.com/v1/track', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your_api_key'
+  },
+  body: JSON.stringify({
+    app_id: 'your_app_id',
+    user_agent: navigator.userAgent,
+    url: window.location.href
+  })
+});
+```
+
+## 主要機能
+
+### トラッキング機能
+- ✅ 軽量JavaScriptビーコン（5KB以下）
+- ✅ 非同期読み込み
+- ✅ クローラー検出・除外
+- ✅ クッキーレストラッキング
+- ✅ DNT（Do Not Track）対応
+- ✅ セッション管理
+
+### データ管理
+- ✅ 月別パーティショニング
+- ✅ 高パフォーマンス書き込み
+- ✅ 複数アプリケーション対応
+- ✅ カスタムフィールド対応
+- ✅ バッチ処理
+
+### セキュリティ
+- ✅ API Key認証
+- ✅ レート制限
+- ✅ 入力値検証
+- ✅ クロスサイト干渉防止
+- ✅ HTTPS通信
+
+### 監視・分析
+- ✅ リアルタイム統計
+- ✅ パフォーマンス監視
+- ✅ エラーログ
+- ✅ アラート機能
+
+## パフォーマンス仕様
+
+- **スループット**: 2000 req/sec以上（簡素化による最適化）
+- **レスポンス時間**: 100ms以下（簡素化による安定性）
+- **同時接続**: 5000以上（簡素化による安定性）
+- **データ保持**: 2年間
+- **可用性**: 99.9%以上
+
+## 対応ブラウザ
+
+- Chrome 60+
+- Firefox 55+
+- Safari 11+
+- Edge 79+
+- IE 11（制限あり）
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。
+
+## サポート
+
+技術的な質問や問題については、以下の方法でサポートを受けることができます：
+
+- **Issues**: GitHubのIssuesページ
+- **ドキュメント**: 各仕様書を参照
+- **サンプルコード**: `/examples`ディレクトリ
+
+## 更新履歴
+
+### v4.0.0 (2024-01-15)
+- 簡素化構成への移行
+- 直接PostgreSQL書き込み
+- シンプルな構成による安定性向上
+- コスト最適化（月間$50）
+- 複雑性の大幅削減
+
+### v3.0.0 (2024-01-15)
+- コスト最適化構成への移行
+- SQS + Lambdaによるサーバーレス処理
+- ElastiCacheによる高速バッファリング
+- 大幅なコスト削減（78.6%削減）
+- 性能向上（同時接続数20,000以上、スループット10000 req/sec以上）
+
+### v2.0.0 (2024-01-15)
+- Go + Nginx構成への移行
+- 性能向上（同時接続数10,000以上、スループット5000 req/sec以上）
+- レスポンス時間短縮（50ms以下）
+- メモリ使用量削減
+
+### v1.0.0 (2024-01-01)
+- 初回リリース
+- 基本トラッキング機能
+- API実装
+- データベース設計
+- ドキュメント整備 
