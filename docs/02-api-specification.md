@@ -9,7 +9,7 @@ https://api.access-log-tracker.com/v1
 
 ### 1.2 インフラ構成（簡素化版）
 - **ALB**: ロードバランシングとSSL終端
-- **Nginx + OpenResty**: リバースプロキシとWebサーバー
+- **Nginx**: リバースプロキシとWebサーバー
 - **Go + Gin**: 軽量APIサーバー（直接書き込み処理）
 - **RDS PostgreSQL**: 管理されたデータベース（直接書き込み）
 

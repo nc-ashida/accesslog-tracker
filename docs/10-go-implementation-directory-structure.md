@@ -22,6 +22,9 @@ access-log-tracker/
 │   │   ├── nginx.conf                 # メイン設定
 │   │   ├── ssl/                       # SSL証明書
 │   │   └── sites-enabled/             # サイト設定
+│   ├── app/                           # アプリケーション設定
+│   │   ├── config.yaml                # アプリケーション設定
+│   │   └── secrets.yaml               # シークレット設定
 │   ├── kubernetes/                    # Kubernetes設定
 │   │   ├── namespace.yaml
 │   │   ├── configmap.yaml
@@ -165,10 +168,12 @@ access-log-tracker/
 │   │   └── beacon/                    # ビーコンE2Eテスト
 │   ├── performance/                   # パフォーマンステスト
 │   │   ├── load_test.yml              # 負荷テスト設定
-│   │   └── stress_test.yml            # ストレステスト設定
+│   │   ├── stress_test.yml            # ストレステスト設定
+│   │   └── benchmark_test.go          # ベンチマークテスト
 │   ├── security/                      # セキュリティテスト
 │   │   ├── authentication_test.go     # 認証テスト
-│   │   └── authorization_test.go      # 認可テスト
+│   │   ├── authorization_test.go      # 認可テスト
+│   │   └── input_validation_test.go  # 入力値検証テスト
 │   ├── fixtures/                      # テストデータ
 │   │   ├── tracking_data.json         # トラッキングテストデータ
 │   │   ├── applications.json          # アプリケーションテストデータ

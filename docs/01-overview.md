@@ -12,7 +12,7 @@
 ### 1.3 技術スタック
 - **インフラ**: AWS (CloudFront, ALB, EC2, RDS Aurora PostgreSQL)
 - **バックエンド**: Go + Gin Framework
-- **Webサーバー**: Nginx + OpenResty (Lua)
+- **Webサーバー**: Nginx
 - **データベース**: Aurora PostgreSQL
 - **フロントエンド**: Vanilla JavaScript
 - **開発環境**: Docker

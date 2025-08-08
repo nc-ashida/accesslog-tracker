@@ -9,7 +9,7 @@
 ### 1.2 基本仕様
 - **ファイルサイズ**: 5KB以下（gzip圧縮後）
 - **読み込み方式**: 非同期読み込み
-- **ブラウザ対応**: IE11以上、Chrome、Firefox、Safari、Edge
+- **ブラウザ対応**: Chrome、Firefox、Safari、Edge（IE11は非対応）
 - **セキュリティ**: クロスサイト干渉防止
 - **配信方式**: CloudFront + S3による高速配信
 

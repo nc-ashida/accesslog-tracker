@@ -72,158 +72,258 @@ class TestDataGenerator {
 ## 3. 単体テスト
 
 ### 3.1 テストフレームワーク
-```json
-// package.json
-{
-  "devDependencies": {
-    "jest": "^29.0.0",
-    "supertest": "^6.0.0",
-    "puppeteer": "^21.0.0",
-    "artillery": "^2.0.0"
-  },
-  "scripts": {
-    "test": "jest",
-    "test:unit": "jest --testPathPattern=unit",
-    "test:integration": "jest --testPathPattern=integration",
-    "test:e2e": "jest --testPathPattern=e2e",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch"
-  }
-}
+```go
+// go.mod
+module access-log-tracker
+
+go 1.21
+
+require (
+    github.com/gin-gonic/gin v1.9.1
+    github.com/lib/pq v1.10.9
+    github.com/go-redis/redis/v8 v8.11.5
+    github.com/stretchr/testify v1.8.4
+    github.com/golang-migrate/migrate/v4 v4.16.2
+    github.com/prometheus/client_golang v1.17.0
+    github.com/gin-contrib/prometheus v0.0.0-20230501144526-8c036d44e6b7
+)
+
+// Makefile
+test:
+	go test ./...
+test-unit:
+	go test ./tests/unit/...
+test-integration:
+	go test ./tests/integration/...
+test-e2e:
+	go test ./tests/e2e/...
+test-coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
 ```
 
 ### 3.2 ユーティリティ関数のテスト
-```javascript
-// tests/unit/utils/tracking-validator.test.js
-const { validateTrackingData, isCrawler } = require('../../../src/utils/tracking-validator');
+```go
+// tests/unit/utils/tracking_validator_test.go
+package utils_test
 
-describe('Tracking Validator', () => {
-  describe('validateTrackingData', () => {
-    test('should validate correct tracking data', () => {
-      const validData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      const result = validateTrackingData(validData);
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "access-log-tracker/internal/domain/validators"
+    "access-log-tracker/internal/domain/models"
+)
+
+func TestTrackingValidator_ValidateTrackingData(t *testing.T) {
+    validator := validators.NewTrackingValidator()
     
-    test('should reject missing app_id', () => {
-      const invalidData = {
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      const result = validateTrackingData(invalidData);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('app_id is required');
-    });
+    tests := []struct {
+        name    string
+        data    models.TrackingRequest
+        isValid bool
+        errors  []string
+    }{
+        {
+            name: "valid tracking data",
+            data: models.TrackingRequest{
+                AppID:     "test_app_123",
+                UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                URL:       "https://example.com",
+            },
+            isValid: true,
+            errors:  []string{},
+        },
+        {
+            name: "missing app_id",
+            data: models.TrackingRequest{
+                UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                URL:       "https://example.com",
+            },
+            isValid: false,
+            errors:  []string{"app_id is required"},
+        },
+        {
+            name: "invalid URL format",
+            data: models.TrackingRequest{
+                AppID:     "test_app_123",
+                UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                URL:       "invalid-url",
+            },
+            isValid: false,
+            errors:  []string{"Invalid URL format"},
+        },
+    }
     
-    test('should reject invalid URL format', () => {
-      const invalidData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'invalid-url'
-      };
-      
-      const result = validateTrackingData(invalidData);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid URL format');
-    });
-  });
-  
-  describe('isCrawler', () => {
-    test('should detect Googlebot', () => {
-      const userAgent = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
-      expect(isCrawler(userAgent)).toBe(true);
-    });
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := validator.Validate(&tt.data)
+            
+            if tt.isValid {
+                assert.NoError(t, result)
+            } else {
+                assert.Error(t, result)
+                assert.Contains(t, result.Error(), tt.errors[0])
+            }
+        })
+    }
+}
+
+func TestTrackingValidator_IsCrawler(t *testing.T) {
+    validator := validators.NewTrackingValidator()
     
-    test('should detect Bingbot', () => {
-      const userAgent = 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)';
-      expect(isCrawler(userAgent)).toBe(true);
-    });
+    tests := []struct {
+        name      string
+        userAgent string
+        expected  bool
+    }{
+        {
+            name:      "detect Googlebot",
+            userAgent: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            expected:  true,
+        },
+        {
+            name:      "detect Bingbot",
+            userAgent: "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+            expected:  true,
+        },
+        {
+            name:      "regular browser",
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            expected:  false,
+        },
+    }
     
-    test('should not detect regular browser', () => {
-      const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-      expect(isCrawler(userAgent)).toBe(false);
-    });
-  });
-});
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := validator.IsCrawler(tt.userAgent)
+            assert.Equal(t, tt.expected, result)
+        })
+    }
+}
 ```
 
 ### 3.3 データベース関数のテスト
-```javascript
-// tests/unit/database/tracking-repository.test.js
-const { TrackingRepository } = require('../../../src/database/tracking-repository');
-const { mockDatabase } = require('../../mocks/database');
+```go
+// tests/unit/infrastructure/database/tracking_repository_test.go
+package database_test
 
-describe('TrackingRepository', () => {
-  let repository;
-  let mockDb;
-  
-  beforeEach(() => {
-    mockDb = mockDatabase();
-    repository = new TrackingRepository(mockDb);
-  });
-  
-  describe('saveTrackingData', () => {
-    test('should save tracking data successfully', async () => {
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com',
-        created_at: new Date()
-      };
-      
-      const result = await repository.saveTrackingData(trackingData);
-      
-      expect(result.id).toBeDefined();
-      expect(mockDb.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO access_logs'),
-        expect.arrayContaining([trackingData.app_id])
-      );
-    });
+import (
+    "database/sql"
+    "testing"
+    "time"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/mock"
+    "access-log-tracker/internal/infrastructure/database/postgresql/repositories"
+    "access-log-tracker/internal/domain/models"
+)
+
+type MockDB struct {
+    mock.Mock
+}
+
+func (m *MockDB) Exec(query string, args ...interface{}) (sql.Result, error) {
+    mockArgs := m.Called(query, args)
+    return mockArgs.Get(0).(sql.Result), mockArgs.Error(1)
+}
+
+func (m *MockDB) QueryRow(query string, args ...interface{}) *sql.Row {
+    mockArgs := m.Called(query, args)
+    return mockArgs.Get(0).(*sql.Row)
+}
+
+func TestTrackingRepository_SaveTrackingData(t *testing.T) {
+    mockDB := &MockDB{}
+    repository := repositories.NewTrackingRepository(mockDB)
     
-    test('should handle database errors', async () => {
-      mockDb.query.mockRejectedValue(new Error('Database connection failed'));
-      
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      await expect(repository.saveTrackingData(trackingData))
-        .rejects.toThrow('Database connection failed');
-    });
-  });
-  
-  describe('getStatistics', () => {
-    test('should return correct statistics', async () => {
-      const mockStats = {
-        total_requests: 1000,
-        unique_visitors: 500,
-        unique_sessions: 750
-      };
-      
-      mockDb.query.mockResolvedValue({ rows: [mockStats] });
-      
-      const result = await repository.getStatistics('test_app_123', {
-        start_date: '2024-01-01',
-        end_date: '2024-01-31'
-      });
-      
-      expect(result).toEqual(mockStats);
-      expect(mockDb.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT'),
-        expect.arrayContaining(['test_app_123'])
-      );
-    });
-  });
-});
+    trackingData := &models.TrackingData{
+        AppID:     "test_app_123",
+        UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        URL:       "https://example.com",
+        CreatedAt: time.Now(),
+    }
+    
+    // 成功ケース
+    t.Run("should save tracking data successfully", func(t *testing.T) {
+        mockDB.On("Exec", mock.AnythingOfType("string"), mock.Anything).Return(
+            &MockResult{lastInsertId: 1}, nil,
+        ).Once()
+        
+        err := repository.SaveTrackingData(trackingData)
+        
+        assert.NoError(t, err)
+        mockDB.AssertExpectations(t)
+    })
+    
+    // エラーケース
+    t.Run("should handle database errors", func(t *testing.T) {
+        mockDB.On("Exec", mock.AnythingOfType("string"), mock.Anything).Return(
+            nil, sql.ErrConnDone,
+        ).Once()
+        
+        err := repository.SaveTrackingData(trackingData)
+        
+        assert.Error(t, err)
+        assert.Equal(t, sql.ErrConnDone, err)
+    })
+}
+
+func TestTrackingRepository_GetStatistics(t *testing.T) {
+    mockDB := &MockDB{}
+    repository := repositories.NewTrackingRepository(mockDB)
+    
+    startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+    endDate := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC)
+    
+    t.Run("should return correct statistics", func(t *testing.T) {
+        expectedStats := &models.Statistics{
+            TotalRequests:  1000,
+            UniqueVisitors: 500,
+            UniqueSessions: 750,
+        }
+        
+        mockRow := &MockRow{stats: expectedStats}
+        mockDB.On("QueryRow", mock.AnythingOfType("string"), mock.Anything).Return(mockRow).Once()
+        
+        result, err := repository.GetStatistics("test_app_123", startDate, endDate)
+        
+        assert.NoError(t, err)
+        assert.Equal(t, expectedStats, result)
+        mockDB.AssertExpectations(t)
+    })
+}
+
+// モックヘルパー
+type MockResult struct {
+    lastInsertId int64
+    rowsAffected int64
+}
+
+func (m *MockResult) LastInsertId() (int64, error) {
+    return m.lastInsertId, nil
+}
+
+func (m *MockResult) RowsAffected() (int64, error) {
+    return m.rowsAffected, nil
+}
+
+type MockRow struct {
+    stats *models.Statistics
+}
+
+func (m *MockRow) Scan(dest ...interface{}) error {
+    if len(dest) >= 3 {
+        if totalRequests, ok := dest[0].(*int64); ok {
+            *totalRequests = m.stats.TotalRequests
+        }
+        if uniqueSessions, ok := dest[1].(*int64); ok {
+            *uniqueSessions = m.stats.UniqueSessions
+        }
+        if uniqueVisitors, ok := dest[2].(*int64); ok {
+            *uniqueVisitors = m.stats.UniqueVisitors
+        }
+    }
+    return nil
+}
 ```
 
 ## 4. 統合テスト
