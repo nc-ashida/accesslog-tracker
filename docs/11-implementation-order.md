@@ -10,40 +10,47 @@
 - プロジェクト初期化
 - ユーティリティ層実装
 - 開発環境構築
-- テスト環境構築
+- 基本的なテスト環境構築
 
 ### フェーズ2: ドメイン層実装（1週間）
 - ドメインモデル定義
 - バリデーター実装
+- ドメイン層テスト実装
 
 ### フェーズ3: インフラ層実装（1-2週間）
 - データベース接続・リポジトリ
 - キャッシュ機能
+- インフラ層テスト実装
 
 ### フェーズ4: ドメインサービス実装（1週間）
 - ビジネスロジック実装
+- サービス層テスト実装
 
-### フェーズ5: API層実装（1-2週間）
-- ミドルウェア
-- ハンドラー
-- ルーティング
+### フェーズ5: API層・ビーコン実装（2-3週間）
+- ミドルウェア実装
+- ハンドラー実装
+- ビーコン生成機能実装
+- ルーティング・サーバー設定
+- 基本的な監視設定実装
+- API・ビーコン統合テスト実装
 
-### フェーズ6: エントリーポイント実装（1週間）
-- メインアプリケーション
+### フェーズ6: エントリーポイント・監視実装（1週間）
+- メインアプリケーション実装
+- ヘルスチェック・監視強化実装
+- E2Eテスト実装
 
-### フェーズ7: ビーコン機能実装（1-2週間）
-- ビーコン生成
-- Webアセット
+### フェーズ7: デプロイメント設定（1週間）
+- AWS設定実装
+- Kubernetes・Docker設定実装
+- デプロイメントテスト実装
 
-### フェーズ8: テスト実装（1-2週間）
-- 単体・統合・E2Eテスト
-- パフォーマンス・セキュリティテスト
+### フェーズ8: 高度な監視・最適化（1週間）
+- Prometheus・Grafana設定実装
+- CloudWatch設定実装
+- パフォーマンステスト実装
+- セキュリティテスト実装
 
-### フェーズ9: デプロイメント設定（1週間）
-- AWS・Kubernetes・Docker設定
 
-### フェーズ10: 監視設定（1週間）
-- Prometheus・Grafana・CloudWatch
 
 ## 詳細実装順序
 
@@ -116,6 +123,25 @@ internal/utils/
 - Makefileでビルド・デプロイ自動化
 - 各種運用スクリプト
 
+#### 1.4 基本的なテスト環境構築
+**優先度: 高**
+**推定時間: 1日**
+
+```
+tests/
+├── unit/                               # 単体テスト
+├── integration/                        # 統合テスト
+├── fixtures/                           # テストデータ
+├── mocks/                             # モック
+└── helpers/                           # テストヘルパー
+```
+
+**実装内容:**
+- テストフレームワーク設定（testify）
+- テストデータ生成ツール
+- モック作成ヘルパー
+- CI/CD用テスト設定
+
 ### フェーズ2: ドメイン層実装（1週間）
 
 #### 2.1 ドメインモデル定義
@@ -153,6 +179,27 @@ internal/domain/validators/
 - アプリケーションIDの検証
 - 必須フィールドのチェック
 - データ型・形式の検証
+
+#### 2.3 ドメイン層テスト実装
+**優先度: 高**
+**推定時間: 2日**
+
+```
+tests/unit/domain/
+├── models/                             # モデルテスト
+│   ├── tracking_test.go
+│   ├── application_test.go
+│   └── session_test.go
+└── validators/                         # バリデーターテスト
+    ├── tracking_validator_test.go
+    └── application_validator_test.go
+```
+
+**実装内容:**
+- ドメインモデルの単体テスト
+- バリデーターの単体テスト
+- テストカバレッジ80%以上を目標
+- エッジケースのテスト
 
 ### フェーズ3: インフラ層実装（1-2週間）
 
@@ -202,6 +249,30 @@ internal/infrastructure/cache/
 - 統計データキャッシュ
 - キャッシュインターフェース
 
+#### 3.3 インフラ層テスト実装
+**優先度: 高**
+**推定時間: 3日**
+
+```
+tests/unit/infrastructure/
+├── database/                           # データベーステスト
+│   ├── postgresql/
+│   │   ├── connection_test.go
+│   │   └── repositories/
+│   │       ├── tracking_repository_test.go
+│   │       ├── application_repository_test.go
+│   │       └── session_repository_test.go
+└── cache/                              # キャッシュテスト
+    └── redis/
+        └── cache_service_test.go
+```
+
+**実装内容:**
+- データベース接続テスト
+- リポジトリの単体テスト
+- キャッシュ機能のテスト
+- 統合テスト環境の構築
+
 ### フェーズ4: ドメインサービス実装（1週間）
 
 #### 4.1 ビジネスロジック実装
@@ -222,7 +293,25 @@ internal/domain/services/
 - 統計データ生成ロジック
 - Webhook送信ロジック
 
-### フェーズ5: API層実装（1-2週間）
+#### 4.2 サービス層テスト実装
+**優先度: 高**
+**推定時間: 3日**
+
+```
+tests/unit/domain/services/
+├── tracking_service_test.go
+├── application_service_test.go
+├── statistics_service_test.go
+└── webhook_service_test.go
+```
+
+**実装内容:**
+- サービスの単体テスト
+- モックを使用した依存関係の分離
+- ビジネスロジックのテスト
+- エラーハンドリングのテスト
+
+### フェーズ5: API層・ビーコン実装（2-3週間）
 
 #### 5.1 ミドルウェア実装
 **優先度: 高**
@@ -264,49 +353,8 @@ internal/api/handlers/
 - アプリケーション管理エンドポイント
 - Webhook設定エンドポイント
 
-#### 5.3 ルーティング・サーバー設定
+#### 5.3 ビーコン生成機能実装
 **優先度: 高**
-**推定時間: 2日**
-
-```
-internal/api/
-├── routes/
-│   ├── v1.go                           # v1 APIルート
-│   └── routes.go                        # ルート設定
-└── server.go                           # サーバー設定
-```
-
-**実装内容:**
-- RESTful APIルート定義
-- バージョニング対応
-- サーバー設定・起動処理
-
-### フェーズ6: エントリーポイント実装（1週間）
-
-#### 6.1 メインアプリケーション
-**優先度: 最高**
-**推定時間: 3日**
-
-```
-cmd/
-├── api/
-│   └── main.go                         # APIサーバーメイン
-├── worker/
-│   └── main.go                         # バッチワーカーメイン
-└── beacon-generator/
-    └── main.go                         # ビーコン生成メイン
-```
-
-**実装内容:**
-- APIサーバー起動処理
-- グレースフルシャットダウン
-- 環境変数読み込み
-- 依存関係注入
-
-### フェーズ7: ビーコン機能実装（1-2週間）
-
-#### 7.1 ビーコン生成
-**優先度: 中**
 **推定時間: 5日**
 
 ```
@@ -330,77 +378,298 @@ internal/beacon/
 - コード圧縮機能
 - 設定管理
 
-#### 7.2 Webアセット
+#### 5.4 ルーティング・サーバー設定
+**優先度: 高**
+**推定時間: 2日**
+
+```
+internal/api/
+├── routes/
+│   ├── v1.go                           # v1 APIルート
+│   └── routes.go                        # ルート設定
+└── server.go                           # サーバー設定
+```
+
+**実装内容:**
+- RESTful APIルート定義
+- バージョニング対応
+- サーバー設定・起動処理
+
+#### 5.5 基本的な監視設定実装
+**優先度: 中**
+**推定時間: 2日**
+
+```
+internal/monitoring/
+├── health/                             # ヘルスチェック
+│   ├── health_checker.go
+│   └── metrics.go
+├── prometheus/                         # Prometheus設定
+│   └── metrics.go
+└── logging/                            # ログ設定
+    └── structured_logger.go
+```
+
+**実装内容:**
+- ヘルスチェック機能
+- 基本的なメトリクス収集
+- 構造化ログ設定
+- アラート設定
+
+#### 5.6 API・ビーコン統合テスト実装
+**優先度: 高**
+**推定時間: 3日**
+
+```
+tests/integration/
+├── api/                                # API統合テスト
+│   ├── tracking_test.go
+│   ├── health_test.go
+│   └── beacon_test.go
+└── beacon/                             # ビーコン統合テスト
+    ├── generator_test.go
+    └── template_test.go
+```
+
+**実装内容:**
+- APIエンドポイントの統合テスト
+- ビーコン生成の統合テスト
+- エンドツーエンドの動作確認
+- パフォーマンステスト
+
+### フェーズ6: エントリーポイント・監視実装（1週間）
+
+#### 6.1 メインアプリケーション実装
+**優先度: 最高**
+**推定時間: 3日**
+
+```
+cmd/
+├── api/
+│   └── main.go                         # APIサーバーメイン
+├── worker/
+│   └── main.go                         # バッチワーカーメイン
+└── beacon-generator/
+    └── main.go                         # ビーコン生成メイン
+```
+
+**実装内容:**
+- APIサーバー起動処理
+- グレースフルシャットダウン
+- 環境変数読み込み
+- 依存関係注入
+
+#### 6.2 ヘルスチェック・監視強化実装
+**優先度: 高**
+**推定時間: 2日**
+
+```
+internal/monitoring/
+├── health/
+│   ├── readiness.go                     # Readiness Probe
+│   ├── liveness.go                      # Liveness Probe
+│   └── startup.go                       # Startup Probe
+├── metrics/
+│   ├── custom_metrics.go                # カスタムメトリクス
+│   └── business_metrics.go              # ビジネスメトリクス
+└── alerts/
+    ├── alert_manager.go                 # アラート管理
+    └── notification.go                  # 通知設定
+```
+
+**実装内容:**
+- Kubernetes用ヘルスチェック
+- カスタムメトリクス定義
+- ビジネスメトリクス収集
+- アラート・通知設定
+
+#### 6.3 E2Eテスト実装
+**優先度: 中**
+**推定時間: 2日**
+
+```
+tests/e2e/
+├── tracking/                            # トラッキングE2Eテスト
+│   ├── beacon_loading_test.go
+│   ├── data_sending_test.go
+│   └── session_management_test.go
+├── beacon/                             # ビーコンE2Eテスト
+│   ├── generation_test.go
+│   └── delivery_test.go
+└── performance/                        # パフォーマンステスト
+    ├── load_test.go
+    └── stress_test.go
+```
+
+**実装内容:**
+- ビーコン読み込みテスト
+- データ送信テスト
+- セッション管理テスト
+- パフォーマンス・負荷テスト
+
+### フェーズ7: デプロイメント設定（1週間）
+
+#### 7.1 AWS設定実装
 **優先度: 中**
 **推定時間: 3日**
 
 ```
-web/
-├── static/
-│   ├── js/
-│   │   ├── tracker.js                   # トラッキングビーコン
-│   │   └── admin.js                     # 管理画面用JS
-│   ├── css/
-│   │   └── admin.css                    # 管理画面用CSS
-│   └── images/                          # 画像
-└── templates/
-    ├── admin/                           # 管理画面テンプレート
-    │   ├── dashboard.html
-    │   ├── applications.html
-    │   └── statistics.html
-    └── beacon/
-        └── embed.html                   # 埋め込み用HTML
+deployments/aws/
+├── cloudformation/                      # CloudFormation
+│   ├── infrastructure.yml               # インフラ設定
+│   ├── alb.yml                         # ALB設定
+│   ├── ec2.yml                         # EC2設定
+│   ├── rds.yml                         # RDS設定
+│   └── cloudfront.yml                  # CloudFront設定
+├── terraform/                          # Terraform設定
+│   ├── main.tf                         # メイン設定
+│   ├── variables.tf                    # 変数定義
+│   ├── outputs.tf                      # 出力定義
+│   └── modules/                        # Terraformモジュール
+└── lambda/                             # Lambda関数
+    ├── edge-functions/                  # Lambda@Edge
+    └── workers/                         # ワーカー関数
 ```
 
 **実装内容:**
-- フロントエンドJavaScript
-- 管理画面CSS
-- HTMLテンプレート
-- 埋め込み用HTML
+- CloudFormation/Terraform設定
+- ALB・EC2・RDS設定
+- CloudFront設定
+- Lambda関数（バッチ処理）
 
-### フェーズ8: テスト実装（1-2週間）
-
-#### 8.1 単体テスト
-**優先度: 高**
-**推定時間: 5日**
-
-```
-tests/unit/
-├── api/                                # APIテスト
-├── domain/                             # ドメインテスト
-├── infrastructure/                      # インフラテスト
-└── utils/                              # ユーティリティテスト
-```
-
-**実装内容:**
-- ハンドラーの単体テスト
-- サービスの単体テスト
-- リポジトリの単体テスト
-- ユーティリティの単体テスト
-
-#### 8.2 統合テスト・E2Eテスト
+#### 7.2 Kubernetes・Docker設定実装
 **優先度: 中**
-**推定時間: 5日**
+**推定時間: 2日**
 
 ```
-tests/
-├── integration/                         # 統合テスト
-│   ├── api/                            # API統合テスト
-│   ├── database/                        # データベース統合テスト
-│   └── beacon/                         # ビーコン統合テスト
-├── e2e/                                # E2Eテスト
-│   ├── tracking/                        # トラッキングE2Eテスト
-│   └── beacon/                         # ビーコンE2Eテスト
-├── fixtures/                            # テストデータ
-├── mocks/                              # モック
-└── helpers/                            # テストヘルパー
+deployments/
+├── kubernetes/                          # Kubernetes設定
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   └── hpa.yaml                        # Horizontal Pod Autoscaler
+└── docker/                             # Docker設定
+    ├── Dockerfile.dev                   # 開発用Dockerfile
+    ├── Dockerfile.prod                  # 本番用Dockerfile
+    └── docker-compose.yml               # Docker Compose
 ```
 
 **実装内容:**
-- API統合テスト
-- データベース統合テスト
-- ビーコンE2Eテスト
-- テストデータ・モック
+- Kubernetesマニフェスト
+- Docker設定
+- オートスケーリング設定
+
+#### 7.3 デプロイメントテスト実装
+**優先度: 中**
+**推定時間: 2日**
+
+```
+tests/deployment/
+├── infrastructure/                      # インフラテスト
+│   ├── aws_test.go
+│   └── kubernetes_test.go
+├── deployment/                          # デプロイメントテスト
+│   ├── smoke_test.go
+│   └── rollback_test.go
+└── security/                            # セキュリティテスト
+    ├── ssl_test.go
+    └── access_control_test.go
+```
+
+**実装内容:**
+- インフラ設定のテスト
+- デプロイメントプロセスのテスト
+- セキュリティ設定のテスト
+- ロールバック機能のテスト
+
+### フェーズ8: 高度な監視・最適化（1週間）
+
+#### 8.1 Prometheus・Grafana設定実装
+**優先度: 低**
+**推定時間: 3日**
+
+```
+monitoring/
+├── prometheus/                          # Prometheus設定
+│   ├── prometheus.yml                   # Prometheus設定
+│   └── rules/                          # アラートルール
+│       ├── api_alerts.yml              # APIアラート
+│       └── system_alerts.yml           # システムアラート
+├── grafana/                             # Grafana設定
+│   ├── dashboards/                      # ダッシュボード
+│   │   ├── api_dashboard.json          # APIダッシュボード
+│   │   ├── beacon_dashboard.json       # ビーコンダッシュボード
+│   │   └── system_dashboard.json       # システムダッシュボード
+│   └── datasources/                     # データソース
+│       └── prometheus.yml              # Prometheusデータソース
+```
+
+**実装内容:**
+- Prometheus設定
+- Grafanaダッシュボード
+- アラートルール設定
+- メトリクス収集
+
+#### 8.2 CloudWatch設定実装
+**優先度: 低**
+**推定時間: 2日**
+
+```
+monitoring/cloudwatch/                   # CloudWatch設定
+├── alarms/                              # アラーム
+│   ├── api_alarms.yml                  # APIアラーム
+│   └── system_alarms.yml               # システムアラーム
+├── dashboards/                          # CloudWatchダッシュボード
+│   └── main_dashboard.json             # メインダッシュボード
+└── logs/                                # ログ設定
+    ├── log_groups.yml                   # ロググループ設定
+    └── log_filters.yml                  # ログフィルター設定
+```
+
+**実装内容:**
+- CloudWatchアラーム
+- CloudWatchダッシュボード
+- ログ管理設定
+- メトリクス監視
+
+#### 8.3 パフォーマンステスト実装
+**優先度: 中**
+**推定時間: 1日**
+
+```
+tests/performance/
+├── load_test.go                         # 負荷テスト
+├── stress_test.go                       # ストレステスト
+├── endurance_test.go                    # 耐久テスト
+└── scalability_test.go                  # スケーラビリティテスト
+```
+
+**実装内容:**
+- 負荷テスト（5000 req/sec）
+- ストレステスト
+- 耐久テスト
+- スケーラビリティテスト
+
+#### 8.4 セキュリティテスト実装
+**優先度: 中**
+**推定時間: 1日**
+
+```
+tests/security/
+├── authentication_test.go               # 認証テスト
+├── authorization_test.go                # 認可テスト
+├── input_validation_test.go             # 入力検証テスト
+└── penetration_test.go                  # ペネトレーションテスト
+```
+
+**実装内容:**
+- 認証・認可テスト
+- 入力検証テスト
+- セキュリティ脆弱性テスト
+- ペネトレーションテスト
 
 ### フェーズ9: デプロイメント設定（1週間）
 
@@ -493,21 +762,19 @@ monitoring/
 
 ## 実装の優先順位
 
-### 高優先度（MVP - 4-6週間）
+### 高優先度（MVP - 6-8週間）
 1. **フェーズ1-3**: 基盤構築とデータベース
 2. **フェーズ4**: ドメインサービス
-3. **フェーズ5**: API層（トラッキングハンドラーのみ）
-4. **フェーズ6**: APIサーバーメイン
+3. **フェーズ5**: API層・ビーコン実装
+4. **フェーズ6**: エントリーポイント・監視実装
 
-### 中優先度（機能拡張 - 3-4週間）
-1. **フェーズ7**: ビーコン機能
-2. **フェーズ8**: テスト実装
-3. **フェーズ9**: デプロイメント設定
+### 中優先度（機能拡張 - 2-3週間）
+1. **フェーズ7**: デプロイメント設定
+2. **フェーズ8**: 高度な監視・最適化
 
-### 低優先度（運用・監視 - 2週間）
-1. **フェーズ10**: 監視設定
-2. **フェーズ5**: その他のハンドラー
-3. **フェーズ6**: ワーカーとビーコン生成ツール
+### 低優先度（運用・監視 - 1週間）
+1. **フェーズ8**: 高度な監視・最適化（後半）
+2. パフォーマンス・セキュリティテスト
 
 ## 推奨実装アプローチ
 
@@ -557,8 +824,8 @@ monitoring/
 - **テストカバレッジ**: 80%以上
 
 ### ビジネス指標
-- **MVP提供**: 6週間以内
-- **機能完成**: 12週間以内
-- **本番稼働**: 16週間以内
+- **MVP提供**: 8週間以内
+- **機能完成**: 11週間以内
+- **本番稼働**: 12週間以内
 
 この実装順序により、段階的に機能を構築しながら、早期にMVPを提供し、その後機能を拡張していくことが可能になります。

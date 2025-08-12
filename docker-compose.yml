@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # PostgreSQL データベース
+  postgres:
+    image: postgres:15-alpine
+    container_name: access-log-tracker-postgres
+    environment:
+      POSTGRES_DB: access_log_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "18432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployments/database/init:/docker-entrypoint-initdb.d
+    networks:
+      - access-log-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d access_log_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis キャッシュ
+  redis:
+    image: redis:7-alpine
+    container_name: access-log-tracker-redis
+    command: redis-server --appendonly yes --requirepass ""
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - access-log-tracker-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin (PostgreSQL管理ツール)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: access-log-tracker-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "18081:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - access-log-tracker-network
+    depends_on:
+      - postgres
+
+  # Redis Commander (Redis管理ツール)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: access-log-tracker-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "18082:8081"
+    networks:
+      - access-log-tracker-network
+    depends_on:
+      - redis
+
+  # Prometheus (メトリクス収集)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: access-log-tracker-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - access-log-tracker-network
+
+  # Grafana (ダッシュボード)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: access-log-tracker-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    ports:
+      - "13000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - access-log-tracker-network
+    depends_on:
+      - prometheus
+
+  # Jaeger (分散トレーシング)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: access-log-tracker-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "14250:14250"
+    networks:
+      - access-log-tracker-network
+
+  # Mailhog (メールテスト用)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: access-log-tracker-mailhog
+    ports:
+      - "10025:1025"
+      - "18025:8025"
+    networks:
+      - access-log-tracker-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  access-log-tracker-network:
+    driver: bridge

@@ -42,6 +42,83 @@ environments:
     load_generator: artillery
 ```
 
+### 2.2 Dockerコンテナ環境でのテスト実行
+```bash
+# 開発環境の起動
+make dev-up
+
+# テスト実行（Dockerコンテナ内で実行）
+make test-in-container
+
+# 統合テスト実行（Dockerコンテナ環境を使用）
+make test-integration-container
+
+# E2Eテスト実行（Dockerコンテナ環境を使用）
+make test-e2e-container
+
+# パフォーマンステスト実行（Dockerコンテナ環境を使用）
+make test-performance-container
+```
+
+### 2.3 コンテナ内テスト実行の設定
+```yaml
+# docker-compose.test.yml
+version: '3.8'
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=access_log_tracker_test
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/vendor
+    command: ["make", "test-all"]
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: access_log_tracker_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "18433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d access_log_tracker_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_test_data:
+```
+
 ### 2.2 テストデータ管理
 ```javascript
 // test-data-generator.js
@@ -329,97 +406,183 @@ func (m *MockRow) Scan(dest ...interface{}) error {
 ## 4. 統合テスト
 
 ### 4.1 APIエンドポイントのテスト
-```javascript
-// tests/integration/api/tracking.test.js
-const request = require('supertest');
-const app = require('../../../src/app');
-const { setupTestDatabase, cleanupTestDatabase } = require('../../helpers/database');
+```go
+// tests/integration/api/tracking_test.go
+package api_test
 
-describe('Tracking API', () => {
-  beforeAll(async () => {
-    await setupTestDatabase();
-  });
-  
-  afterAll(async () => {
-    await cleanupTestDatabase();
-  });
-  
-  describe('POST /v1/track', () => {
-    test('should accept valid tracking data', async () => {
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com',
-        session_id: 'alt_1234567890_abc123'
-      };
-      
-      const response = await request(app)
-        .post('/v1/track')
-        .set('X-API-Key', 'test_api_key')
-        .send(trackingData)
-        .expect(200);
-      
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.tracking_id).toBeDefined();
-    });
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "time"
     
-    test('should reject invalid API key', async () => {
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      const response = await request(app)
-        .post('/v1/track')
-        .set('X-API-Key', 'invalid_key')
-        .send(trackingData)
-        .expect(401);
-      
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('AUTHENTICATION_ERROR');
-    });
+    "github.com/gin-gonic/gin"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
     
-    test('should handle rate limiting', async () => {
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      // 1001回リクエストを送信（制限: 1000 req/min）
-      const requests = Array.from({ length: 1001 }, () =>
-        request(app)
-          .post('/v1/track')
-          .set('X-API-Key', 'test_api_key')
-          .send(trackingData)
-      );
-      
-      const responses = await Promise.all(requests);
-      const rateLimitedResponses = responses.filter(r => r.status === 429);
-      
-      expect(rateLimitedResponses.length).toBeGreaterThan(0);
-    });
-  });
-  
-  describe('GET /v1/statistics', () => {
-    test('should return statistics for valid app_id', async () => {
-      const response = await request(app)
-        .get('/v1/statistics')
-        .set('X-API-Key', 'test_api_key')
-        .query({
-          app_id: 'test_app_123',
-          start_date: '2024-01-01',
-          end_date: '2024-01-31'
-        })
-        .expect(200);
-      
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('total_requests');
-      expect(response.body.data).toHaveProperty('unique_visitors');
-    });
-  });
-});
+    "access-log-tracker/internal/api/handlers"
+    "access-log-tracker/internal/api/middleware"
+    "access-log-tracker/internal/domain/models"
+    "access-log-tracker/internal/infrastructure/database/postgresql/repositories"
+    "access-log-tracker/internal/infrastructure/cache/redis"
+)
+
+func setupTestServer(t *testing.T) *gin.Engine {
+    // テスト用データベース接続
+    db, err := setupTestDatabase()
+    require.NoError(t, err)
+    
+    // テスト用Redis接続
+    redisClient, err := setupTestRedis()
+    require.NoError(t, err)
+    
+    // リポジトリの初期化
+    trackingRepo := repositories.NewTrackingRepository(db)
+    applicationRepo := repositories.NewApplicationRepository(db)
+    
+    // ハンドラーの初期化
+    trackingHandler := handlers.NewTrackingHandler(trackingRepo, redisClient)
+    applicationHandler := handlers.NewApplicationHandler(applicationRepo)
+    
+    // ルーターの設定
+    router := gin.New()
+    router.Use(gin.Recovery())
+    router.Use(middleware.CORS())
+    router.Use(middleware.Logging())
+    router.Use(middleware.RateLimit(redisClient))
+    
+    // ルートの設定
+    v1 := router.Group("/v1")
+    {
+        v1.POST("/track", middleware.Auth(applicationRepo), trackingHandler.Track)
+        v1.GET("/statistics", middleware.Auth(applicationRepo), trackingHandler.GetStatistics)
+        v1.POST("/applications", applicationHandler.Create)
+    }
+    
+    return router
+}
+
+func TestTrackingAPI(t *testing.T) {
+    router := setupTestServer(t)
+    
+    t.Run("POST /v1/track - should accept valid tracking data", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+            SessionID: "alt_1234567890_abc123",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", "test_api_key")
+        
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusOK, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, true, response["success"])
+        assert.NotNil(t, response["data"].(map[string]interface{})["tracking_id"])
+    })
+    
+    t.Run("POST /v1/track - should reject invalid API key", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", "invalid_key")
+        
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusUnauthorized, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, false, response["success"])
+        assert.Equal(t, "AUTHENTICATION_ERROR", response["error"].(map[string]interface{})["code"])
+    })
+    
+    t.Run("POST /v1/track - should handle rate limiting", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        
+        // 1001回リクエストを送信（制限: 1000 req/min）
+        rateLimitedCount := 0
+        for i := 0; i < 1001; i++ {
+            req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+            req.Header.Set("Content-Type", "application/json")
+            req.Header.Set("X-API-Key", "test_api_key")
+            
+            w := httptest.NewRecorder()
+            router.ServeHTTP(w, req)
+            
+            if w.Code == http.StatusTooManyRequests {
+                rateLimitedCount++
+            }
+        }
+        
+        assert.Greater(t, rateLimitedCount, 0)
+    })
+    
+    t.Run("GET /v1/statistics - should return statistics for valid app_id", func(t *testing.T) {
+        req := httptest.NewRequest("GET", "/v1/statistics?app_id=test_app_123&start_date=2024-01-01&end_date=2024-01-31", nil)
+        req.Header.Set("X-API-Key", "test_api_key")
+        
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusOK, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, true, response["success"])
+        
+        data := response["data"].(map[string]interface{})
+        assert.NotNil(t, data["total_requests"])
+        assert.NotNil(t, data["unique_visitors"])
+    })
+}
+
+// テスト用データベースセットアップ
+func setupTestDatabase() (*sql.DB, error) {
+    // Dockerコンテナ内のPostgreSQLに接続
+    dsn := "host=postgres port=5432 user=postgres password=password dbname=access_log_tracker_test sslmode=disable"
+    return sql.Open("postgres", dsn)
+}
+
+// テスト用Redisセットアップ
+func setupTestRedis() (*redis.Client, error) {
+    // Dockerコンテナ内のRedisに接続
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     "redis:6379",
+        Password: "",
+        DB:       0,
+    })
+    
+    // 接続テスト
+    _, err := rdb.Ping(context.Background()).Result()
+    return rdb, err
+}
 ```
 
 ### 4.2 データベース統合テスト
@@ -469,185 +632,437 @@ describe('Database Partitioning', () => {
 ## 5. E2Eテスト
 
 ### 5.1 トラッキングビーコンのテスト
-```javascript
-// tests/e2e/tracking-beacon.test.js
-const puppeteer = require('puppeteer');
+```go
+// tests/e2e/tracking_beacon_test.go
+package e2e_test
 
-describe('Tracking Beacon E2E', () => {
-  let browser;
-  let page;
-  
-  beforeAll(async () => {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-  });
-  
-  afterAll(async () => {
-    await browser.close();
-  });
-  
-  beforeEach(async () => {
-    page = await browser.newPage();
+import (
+    "context"
+    "database/sql"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "time"
     
-    // ネットワークリクエストを監視
-    await page.setRequestInterception(true);
-    const requests = [];
-    page.on('request', request => {
-      requests.push(request.url());
-      request.continue();
-    });
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
     
-    page.requests = requests;
-  });
-  
-  test('should send tracking data when page loads', async () => {
-    // テスト用HTMLページを作成
-    const testHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script>
-            window.ALT_CONFIG = {
-              app_id: 'test_app_123',
-              endpoint: 'http://localhost:3000/v1/track'
-            };
-          </script>
-          <script async src="http://localhost:3000/tracker.js"></script>
-        </head>
-        <body>
-          <h1>Test Page</h1>
-        </body>
-      </html>
-    `;
+    "access-log-tracker/internal/api/handlers"
+    "access-log-tracker/internal/api/middleware"
+    "access-log-tracker/internal/domain/models"
+    "access-log-tracker/internal/infrastructure/database/postgresql/repositories"
+    "access-log-tracker/internal/infrastructure/cache/redis"
+)
+
+func TestTrackingBeaconE2E(t *testing.T) {
+    // テスト用サーバーのセットアップ
+    server := setupE2EServer(t)
+    defer server.Close()
     
-    await page.setContent(testHtml);
+    t.Run("should send tracking data when beacon loads", func(t *testing.T) {
+        // テスト用アプリケーションを作成
+        appID := createTestApplication(t, server)
+        
+        // トラッキングビーコンのリクエストをシミュレート
+        trackingData := models.TrackingRequest{
+            AppID:     appID,
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            URL:       "https://example.com/test-page",
+            SessionID: "alt_1234567890_abc123",
+            IPAddress: "192.168.1.100",
+        }
+        
+        // トラッキングリクエストを送信
+        response := sendTrackingRequest(t, server, trackingData, "test_api_key")
+        
+        assert.Equal(t, http.StatusOK, response.Code)
+        
+        var responseBody map[string]interface{}
+        err := json.Unmarshal(response.Body.Bytes(), &responseBody)
+        assert.NoError(t, err)
+        assert.Equal(t, true, responseBody["success"])
+        
+        // データベースにデータが保存されたことを確認
+        trackingID := responseBody["data"].(map[string]interface{})["tracking_id"].(string)
+        savedData := getTrackingDataFromDB(t, trackingID)
+        assert.Equal(t, appID, savedData.AppID)
+        assert.Equal(t, trackingData.URL, savedData.URL)
+    })
     
-    // ページ読み込み完了を待機
-    await page.waitForTimeout(2000);
+    t.Run("should respect DNT setting", func(t *testing.T) {
+        appID := createTestApplication(t, server)
+        
+        trackingData := models.TrackingRequest{
+            AppID:     appID,
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            URL:       "https://example.com/test-page",
+            SessionID: "alt_1234567890_abc123",
+            IPAddress: "192.168.1.100",
+        }
+        
+        // DNTヘッダー付きでリクエストを送信
+        req := createTrackingRequest(t, server, trackingData, "test_api_key")
+        req.Header.Set("DNT", "1")
+        
+        w := httptest.NewRecorder()
+        server.Config.Handler.ServeHTTP(w, req)
+        
+        // DNTが有効な場合、データが保存されないことを確認
+        assert.Equal(t, http.StatusOK, w.Code)
+        
+        var responseBody map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &responseBody)
+        assert.NoError(t, err)
+        assert.Equal(t, true, responseBody["success"])
+        
+        // データベースにデータが保存されていないことを確認
+        trackingID := responseBody["data"].(map[string]interface{})["tracking_id"].(string)
+        savedData := getTrackingDataFromDB(t, trackingID)
+        assert.Nil(t, savedData) // データが保存されていない
+    })
     
-    // トラッキングリクエストが送信されたことを確認
-    const trackingRequests = page.requests.filter(url => 
-      url.includes('/v1/track')
-    );
+    t.Run("should detect crawlers and skip tracking", func(t *testing.T) {
+        appID := createTestApplication(t, server)
+        
+        trackingData := models.TrackingRequest{
+            AppID:     appID,
+            UserAgent: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            URL:       "https://example.com/test-page",
+            SessionID: "alt_1234567890_abc123",
+            IPAddress: "192.168.1.100",
+        }
+        
+        // クローラーのユーザーエージェントでリクエストを送信
+        response := sendTrackingRequest(t, server, trackingData, "test_api_key")
+        
+        assert.Equal(t, http.StatusOK, response.Code)
+        
+        var responseBody map[string]interface{}
+        err := json.Unmarshal(response.Body.Bytes(), &responseBody)
+        assert.NoError(t, err)
+        assert.Equal(t, true, responseBody["success"])
+        
+        // クローラーの場合、データが保存されないことを確認
+        trackingID := responseBody["data"].(map[string]interface{})["tracking_id"].(string)
+        savedData := getTrackingDataFromDB(t, trackingID)
+        assert.Nil(t, savedData) // データが保存されていない
+    })
+}
+
+// E2Eテスト用サーバーセットアップ
+func setupE2EServer(t *testing.T) *httptest.Server {
+    // テスト用データベース接続
+    db, err := setupE2EDatabase()
+    require.NoError(t, err)
     
-    expect(trackingRequests.length).toBeGreaterThan(0);
-  });
-  
-  test('should respect DNT setting', async () => {
-    // DNTヘッダーを設定
-    await page.setExtraHTTPHeaders({
-      'DNT': '1'
-    });
+    // テスト用Redis接続
+    redisClient, err := setupE2ERedis()
+    require.NoError(t, err)
     
-    const testHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script>
-            window.ALT_CONFIG = {
-              app_id: 'test_app_123',
-              endpoint: 'http://localhost:3000/v1/track',
-              respect_dnt: true
-            };
-          </script>
-          <script async src="http://localhost:3000/tracker.js"></script>
-        </head>
-        <body>
-          <h1>Test Page with DNT</h1>
-        </body>
-      </html>
-    `;
+    // リポジトリの初期化
+    trackingRepo := repositories.NewTrackingRepository(db)
+    applicationRepo := repositories.NewApplicationRepository(db)
     
-    await page.setContent(testHtml);
-    await page.waitForTimeout(2000);
+    // ハンドラーの初期化
+    trackingHandler := handlers.NewTrackingHandler(trackingRepo, redisClient)
+    applicationHandler := handlers.NewApplicationHandler(applicationRepo)
     
-    // DNTが有効な場合、トラッキングリクエストが送信されないことを確認
-    const trackingRequests = page.requests.filter(url => 
-      url.includes('/v1/track')
-    );
+    // ルーターの設定
+    router := setupTestRouter(trackingHandler, applicationHandler)
     
-    expect(trackingRequests.length).toBe(0);
-  });
-  
-  test('should detect crawlers and skip tracking', async () => {
-    // ユーザーエージェントをGooglebotに設定
-    await page.setUserAgent('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)');
+    return httptest.NewServer(router)
+}
+
+// テスト用データベースセットアップ（E2E用）
+func setupE2EDatabase() (*sql.DB, error) {
+    // Dockerコンテナ内のPostgreSQLに接続
+    dsn := "host=postgres port=5432 user=postgres password=password dbname=access_log_tracker_e2e sslmode=disable"
+    return sql.Open("postgres", dsn)
+}
+
+// テスト用Redisセットアップ（E2E用）
+func setupE2ERedis() (*redis.Client, error) {
+    // Dockerコンテナ内のRedisに接続
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     "redis:6379",
+        Password: "",
+        DB:       1, // E2Eテスト用のDB
+    })
     
-    const testHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script>
-            window.ALT_CONFIG = {
-              app_id: 'test_app_123',
-              endpoint: 'http://localhost:3000/v1/track'
-            };
-          </script>
-          <script async src="http://localhost:3000/tracker.js"></script>
-        </head>
-        <body>
-          <h1>Test Page for Crawler</h1>
-        </body>
-      </html>
-    `;
+    // 接続テスト
+    _, err := rdb.Ping(context.Background()).Result()
+    return rdb, err
+}
+
+// テスト用アプリケーション作成
+func createTestApplication(t *testing.T, server *httptest.Server) string {
+    appData := models.Application{
+        Name:        "E2E Test App",
+        Description: "Test application for E2E testing",
+        Domain:      "e2e-test.example.com",
+        APIKey:      "test_api_key",
+    }
     
-    await page.setContent(testHtml);
-    await page.waitForTimeout(2000);
+    jsonData, _ := json.Marshal(appData)
+    req := httptest.NewRequest("POST", "/v1/applications", bytes.NewBuffer(jsonData))
+    req.Header.Set("Content-Type", "application/json")
     
-    // クローラーの場合、トラッキングリクエストが送信されないことを確認
-    const trackingRequests = page.requests.filter(url => 
-      url.includes('/v1/track')
-    );
+    w := httptest.NewRecorder()
+    server.Config.Handler.ServeHTTP(w, req)
     
-    expect(trackingRequests.length).toBe(0);
-  });
-});
+    assert.Equal(t, http.StatusCreated, w.Code)
+    
+    var response map[string]interface{}
+    err := json.Unmarshal(w.Body.Bytes(), &response)
+    assert.NoError(t, err)
+    
+    return response["data"].(map[string]interface{})["app_id"].(string)
+}
+
+// トラッキングリクエスト送信ヘルパー
+func sendTrackingRequest(t *testing.T, server *httptest.Server, data models.TrackingRequest, apiKey string) *httptest.ResponseRecorder {
+    req := createTrackingRequest(t, server, data, apiKey)
+    w := httptest.NewRecorder()
+    server.Config.Handler.ServeHTTP(w, req)
+    return w
+}
+
+// トラッキングリクエスト作成ヘルパー
+func createTrackingRequest(t *testing.T, server *httptest.Server, data models.TrackingRequest, apiKey string) *http.Request {
+    jsonData, _ := json.Marshal(data)
+    req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("X-API-Key", apiKey)
+    return req
+}
+
+// データベースからトラッキングデータ取得
+func getTrackingDataFromDB(t *testing.T, trackingID string) *models.TrackingData {
+    db, err := setupE2EDatabase()
+    require.NoError(t, err)
+    defer db.Close()
+    
+    var data models.TrackingData
+    err = db.QueryRow("SELECT * FROM access_logs WHERE tracking_id = $1", trackingID).Scan(
+        &data.ID, &data.TrackingID, &data.AppID, &data.UserAgent, &data.URL,
+        &data.IPAddress, &data.SessionID, &data.CreatedAt,
+    )
+    
+    if err == sql.ErrNoRows {
+        return nil
+    }
+    require.NoError(t, err)
+    
+    return &data
+}
 ```
 
 ## 6. パフォーマンステスト
 
 ### 6.1 負荷テスト
-```javascript
-// tests/performance/load-test.yml
-config:
-  target: 'http://localhost:3000'
-  phases:
-    - duration: 60
-      arrivalRate: 10
-      name: "Warm up"
-    - duration: 300
-      arrivalRate: 100
-      name: "Sustained load"
-    - duration: 60
-      arrivalRate: 500
-      name: "Peak load"
-  defaults:
-    headers:
-      X-API-Key: 'test_api_key'
+```go
+// tests/performance/load_test.go
+package performance_test
 
-scenarios:
-  - name: "Tracking data submission"
-    weight: 80
-    requests:
-      - post:
-          url: "/v1/track"
-          json:
-            app_id: "perf_test_app"
-            user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            url: "https://example.com"
-            session_id: "alt_{{ $randomNumber }}_{{ $randomString }}"
-  
-  - name: "Statistics retrieval"
-    weight: 20
-    requests:
-      - get:
-          url: "/v1/statistics"
-          qs:
-            app_id: "perf_test_app"
-            start_date: "2024-01-01"
-            end_date: "2024-01-31"
+import (
+    "context"
+    "database/sql"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "sync"
+    "testing"
+    "time"
+    
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    
+    "access-log-tracker/internal/api/handlers"
+    "access-log-tracker/internal/api/middleware"
+    "access-log-tracker/internal/domain/models"
+    "access-log-tracker/internal/infrastructure/database/postgresql/repositories"
+    "access-log-tracker/internal/infrastructure/cache/redis"
+)
+
+func TestLoadPerformance(t *testing.T) {
+    server := setupPerformanceServer(t)
+    defer server.Close()
+    
+    t.Run("should handle sustained load", func(t *testing.T) {
+        const (
+            concurrentUsers = 100
+            requestsPerUser = 10
+            totalRequests   = concurrentUsers * requestsPerUser
+        )
+        
+        startTime := time.Now()
+        
+        // 並行リクエストを実行
+        var wg sync.WaitGroup
+        successCount := 0
+        errorCount := 0
+        var mu sync.Mutex
+        
+        for i := 0; i < concurrentUsers; i++ {
+            wg.Add(1)
+            go func(userID int) {
+                defer wg.Done()
+                
+                for j := 0; j < requestsPerUser; j++ {
+                    trackingData := models.TrackingRequest{
+                        AppID:     "perf_test_app",
+                        UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                        URL:       "https://example.com",
+                        SessionID: fmt.Sprintf("alt_%d_%d_%d", time.Now().Unix(), userID, j),
+                    }
+                    
+                    response := sendTrackingRequest(t, server, trackingData, "test_api_key")
+                    
+                    mu.Lock()
+                    if response.Code == http.StatusOK {
+                        successCount++
+                    } else {
+                        errorCount++
+                    }
+                    mu.Unlock()
+                }
+            }(i)
+        }
+        
+        wg.Wait()
+        duration := time.Since(startTime)
+        
+        // パフォーマンス指標を計算
+        requestsPerSecond := float64(totalRequests) / duration.Seconds()
+        successRate := float64(successCount) / float64(totalRequests) * 100
+        
+        t.Logf("Total requests: %d", totalRequests)
+        t.Logf("Duration: %v", duration)
+        t.Logf("Requests per second: %.2f", requestsPerSecond)
+        t.Logf("Success rate: %.2f%%", successRate)
+        t.Logf("Errors: %d", errorCount)
+        
+        // パフォーマンス要件をチェック
+        assert.GreaterOrEqual(t, requestsPerSecond, 100.0, "Should handle at least 100 requests per second")
+        assert.GreaterOrEqual(t, successRate, 95.0, "Success rate should be at least 95%")
+        assert.LessOrEqual(t, errorCount, totalRequests/20, "Error rate should be less than 5%")
+    })
+    
+    t.Run("should handle peak load", func(t *testing.T) {
+        const (
+            peakUsers = 500
+            duration  = 30 * time.Second
+        )
+        
+        startTime := time.Now()
+        var wg sync.WaitGroup
+        successCount := 0
+        errorCount := 0
+        var mu sync.Mutex
+        
+        // 指定時間内で継続的にリクエストを送信
+        for time.Since(startTime) < duration {
+            for i := 0; i < peakUsers; i++ {
+                wg.Add(1)
+                go func() {
+                    defer wg.Done()
+                    
+                    trackingData := models.TrackingRequest{
+                        AppID:     "perf_test_app",
+                        UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                        URL:       "https://example.com",
+                        SessionID: fmt.Sprintf("alt_%d_%d", time.Now().UnixNano(), i),
+                    }
+                    
+                    response := sendTrackingRequest(t, server, trackingData, "test_api_key")
+                    
+                    mu.Lock()
+                    if response.Code == http.StatusOK {
+                        successCount++
+                    } else {
+                        errorCount++
+                    }
+                    mu.Unlock()
+                }()
+            }
+            time.Sleep(100 * time.Millisecond) // 少し待機
+        }
+        
+        wg.Wait()
+        totalDuration := time.Since(startTime)
+        
+        totalRequests := successCount + errorCount
+        requestsPerSecond := float64(totalRequests) / totalDuration.Seconds()
+        successRate := float64(successCount) / float64(totalRequests) * 100
+        
+        t.Logf("Peak load test completed")
+        t.Logf("Total requests: %d", totalRequests)
+        t.Logf("Duration: %v", totalDuration)
+        t.Logf("Requests per second: %.2f", requestsPerSecond)
+        t.Logf("Success rate: %.2f%%", successRate)
+        
+        assert.GreaterOrEqual(t, requestsPerSecond, 200.0, "Should handle at least 200 requests per second under peak load")
+        assert.GreaterOrEqual(t, successRate, 90.0, "Success rate should be at least 90% under peak load")
+    })
+}
+
+// パフォーマンステスト用サーバーセットアップ
+func setupPerformanceServer(t *testing.T) *httptest.Server {
+    // テスト用データベース接続
+    db, err := setupPerformanceDatabase()
+    require.NoError(t, err)
+    
+    // テスト用Redis接続
+    redisClient, err := setupPerformanceRedis()
+    require.NoError(t, err)
+    
+    // リポジトリの初期化
+    trackingRepo := repositories.NewTrackingRepository(db)
+    applicationRepo := repositories.NewApplicationRepository(db)
+    
+    // ハンドラーの初期化
+    trackingHandler := handlers.NewTrackingHandler(trackingRepo, redisClient)
+    applicationHandler := handlers.NewApplicationHandler(applicationRepo)
+    
+    // ルーターの設定
+    router := setupTestRouter(trackingHandler, applicationHandler)
+    
+    return httptest.NewServer(router)
+}
+
+// パフォーマンステスト用データベースセットアップ
+func setupPerformanceDatabase() (*sql.DB, error) {
+    // Dockerコンテナ内のPostgreSQLに接続
+    dsn := "host=postgres port=5432 user=postgres password=password dbname=access_log_tracker_perf sslmode=disable"
+    return sql.Open("postgres", dsn)
+}
+
+// パフォーマンステスト用Redisセットアップ
+func setupPerformanceRedis() (*redis.Client, error) {
+    // Dockerコンテナ内のRedisに接続
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     "redis:6379",
+        Password: "",
+        DB:       2, // パフォーマンステスト用のDB
+    })
+    
+    // 接続テスト
+    _, err := rdb.Ping(context.Background()).Result()
+    return rdb, err
+}
+
+// トラッキングリクエスト送信ヘルパー
+func sendTrackingRequest(t *testing.T, server *httptest.Server, data models.TrackingRequest, apiKey string) *httptest.ResponseRecorder {
+    jsonData, _ := json.Marshal(data)
+    req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("X-API-Key", apiKey)
+    
+    w := httptest.NewRecorder()
+    server.Config.Handler.ServeHTTP(w, req)
+    return w
+}
 ```
 
 ### 6.2 スループットテスト
@@ -718,113 +1133,271 @@ describe('Performance Tests', () => {
 ## 7. セキュリティテスト
 
 ### 7.1 認証・認可テスト
-```javascript
-// tests/security/authentication.test.js
-const request = require('supertest');
-const app = require('../../src/app');
+```go
+// tests/security/authentication_test.go
+package security_test
 
-describe('Security Tests', () => {
-  describe('API Key Authentication', () => {
-    test('should reject requests without API key', async () => {
-      const response = await request(app)
-        .post('/v1/track')
-        .send({
-          app_id: 'test_app_123',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          url: 'https://example.com'
-        })
-        .expect(401);
-      
-      expect(response.body.error.code).toBe('AUTHENTICATION_ERROR');
-    });
+import (
+    "bytes"
+    "context"
+    "database/sql"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
     
-    test('should reject expired API key', async () => {
-      const response = await request(app)
-        .post('/v1/track')
-        .set('X-API-Key', 'expired_api_key')
-        .send({
-          app_id: 'test_app_123',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          url: 'https://example.com'
-        })
-        .expect(401);
-      
-      expect(response.body.error.code).toBe('AUTHENTICATION_ERROR');
-    });
-  });
-  
-  describe('Input Validation', () => {
-    test('should reject SQL injection attempts', async () => {
-      const maliciousData = {
-        app_id: "'; DROP TABLE access_logs; --",
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      const response = await request(app)
-        .post('/v1/track')
-        .set('X-API-Key', 'test_api_key')
-        .send(maliciousData)
-        .expect(400);
-      
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
-    });
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
     
-    test('should reject XSS attempts', async () => {
-      const maliciousData = {
-        app_id: 'test_app_123',
-        user_agent: '<script>alert("XSS")</script>',
-        url: 'https://example.com'
-      };
-      
-      const response = await request(app)
-        .post('/v1/track')
-        .set('X-API-Key', 'test_api_key')
-        .send(maliciousData)
-        .expect(400);
-      
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
-    });
-  });
-  
-  describe('Rate Limiting', () => {
-    test('should enforce rate limits per API key', async () => {
-      const trackingData = {
-        app_id: 'test_app_123',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        url: 'https://example.com'
-      };
-      
-      // 制限を超えるリクエストを送信
-      const requests = Array.from({ length: 1001 }, () =>
-        request(app)
-          .post('/v1/track')
-          .set('X-API-Key', 'test_api_key')
-          .send(trackingData)
-      );
-      
-      const responses = await Promise.all(requests);
-      const rateLimitedResponses = responses.filter(r => r.status === 429);
-      
-      expect(rateLimitedResponses.length).toBeGreaterThan(0);
-    });
-  });
-});
+    "access-log-tracker/internal/api/handlers"
+    "access-log-tracker/internal/api/middleware"
+    "access-log-tracker/internal/domain/models"
+    "access-log-tracker/internal/infrastructure/database/postgresql/repositories"
+    "access-log-tracker/internal/infrastructure/cache/redis"
+)
+
+func TestSecurityAuthentication(t *testing.T) {
+    server := setupSecurityServer(t)
+    defer server.Close()
+    
+    t.Run("should reject requests without API key", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        // X-API-Keyヘッダーを設定しない
+        
+        w := httptest.NewRecorder()
+        server.Config.Handler.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusUnauthorized, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, "AUTHENTICATION_ERROR", response["error"].(map[string]interface{})["code"])
+    })
+    
+    t.Run("should reject expired API key", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", "expired_api_key")
+        
+        w := httptest.NewRecorder()
+        server.Config.Handler.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusUnauthorized, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, "AUTHENTICATION_ERROR", response["error"].(map[string]interface{})["code"])
+    })
+}
+
+func TestSecurityInputValidation(t *testing.T) {
+    server := setupSecurityServer(t)
+    defer server.Close()
+    
+    t.Run("should reject SQL injection attempts", func(t *testing.T) {
+        maliciousData := models.TrackingRequest{
+            AppID:     "'; DROP TABLE access_logs; --",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(maliciousData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", "test_api_key")
+        
+        w := httptest.NewRecorder()
+        server.Config.Handler.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusBadRequest, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, "VALIDATION_ERROR", response["error"].(map[string]interface{})["code"])
+    })
+    
+    t.Run("should reject XSS attempts", func(t *testing.T) {
+        maliciousData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "<script>alert(\"XSS\")</script>",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(maliciousData)
+        req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", "test_api_key")
+        
+        w := httptest.NewRecorder()
+        server.Config.Handler.ServeHTTP(w, req)
+        
+        assert.Equal(t, http.StatusBadRequest, w.Code)
+        
+        var response map[string]interface{}
+        err := json.Unmarshal(w.Body.Bytes(), &response)
+        assert.NoError(t, err)
+        assert.Equal(t, "VALIDATION_ERROR", response["error"].(map[string]interface{})["code"])
+    })
+}
+
+func TestSecurityRateLimiting(t *testing.T) {
+    server := setupSecurityServer(t)
+    defer server.Close()
+    
+    t.Run("should enforce rate limits per API key", func(t *testing.T) {
+        trackingData := models.TrackingRequest{
+            AppID:     "test_app_123",
+            UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            URL:       "https://example.com",
+        }
+        
+        jsonData, _ := json.Marshal(trackingData)
+        
+        // 制限を超えるリクエストを送信（1001回）
+        rateLimitedCount := 0
+        for i := 0; i < 1001; i++ {
+            req := httptest.NewRequest("POST", "/v1/track", bytes.NewBuffer(jsonData))
+            req.Header.Set("Content-Type", "application/json")
+            req.Header.Set("X-API-Key", "test_api_key")
+            
+            w := httptest.NewRecorder()
+            server.Config.Handler.ServeHTTP(w, req)
+            
+            if w.Code == http.StatusTooManyRequests {
+                rateLimitedCount++
+            }
+        }
+        
+        assert.Greater(t, rateLimitedCount, 0, "Should enforce rate limiting")
+    })
+}
+
+// セキュリティテスト用サーバーセットアップ
+func setupSecurityServer(t *testing.T) *httptest.Server {
+    // テスト用データベース接続
+    db, err := setupSecurityDatabase()
+    require.NoError(t, err)
+    
+    // テスト用Redis接続
+    redisClient, err := setupSecurityRedis()
+    require.NoError(t, err)
+    
+    // リポジトリの初期化
+    trackingRepo := repositories.NewTrackingRepository(db)
+    applicationRepo := repositories.NewApplicationRepository(db)
+    
+    // ハンドラーの初期化
+    trackingHandler := handlers.NewTrackingHandler(trackingRepo, redisClient)
+    applicationHandler := handlers.NewApplicationHandler(applicationRepo)
+    
+    // ルーターの設定
+    router := setupTestRouter(trackingHandler, applicationHandler)
+    
+    return httptest.NewServer(router)
+}
+
+// セキュリティテスト用データベースセットアップ
+func setupSecurityDatabase() (*sql.DB, error) {
+    // Dockerコンテナ内のPostgreSQLに接続
+    dsn := "host=postgres port=5432 user=postgres password=password dbname=access_log_tracker_security sslmode=disable"
+    return sql.Open("postgres", dsn)
+}
+
+// セキュリティテスト用Redisセットアップ
+func setupSecurityRedis() (*redis.Client, error) {
+    // Dockerコンテナ内のRedisに接続
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     "redis:6379",
+        Password: "",
+        DB:       3, // セキュリティテスト用のDB
+    })
+    
+    // 接続テスト
+    _, err := rdb.Ping(context.Background()).Result()
+    return rdb, err
+}
 ```
 
 ## 8. テスト実行とレポート
 
 ### 8.1 テスト実行スクリプト
-```json
-// package.json
-{
-  "scripts": {
-    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "test:ci": "npm run test:coverage && npm run test:performance",
-    "test:security": "npm run test:security",
-    "test:report": "jest --coverage --coverageReporters=html --coverageReporters=text"
-  }
-}
+```makefile
+# Makefile テスト関連コマンド
+.PHONY: test-all
+test-all: ## すべてのテストを実行
+	@echo "すべてのテストを実行中..."
+	go test -v ./...
+
+.PHONY: test-unit
+test-unit: ## 単体テストを実行
+	@echo "単体テストを実行中..."
+	go test -v ./internal/domain/...
+	go test -v ./internal/utils/...
+
+.PHONY: test-integration
+test-integration: ## 統合テストを実行
+	@echo "統合テストを実行中..."
+	go test -v ./internal/infrastructure/...
+	go test -v ./internal/api/...
+
+.PHONY: test-e2e
+test-e2e: ## E2Eテストを実行
+	@echo "E2Eテストを実行中..."
+	go test -v ./tests/e2e/...
+
+.PHONY: test-performance
+test-performance: ## パフォーマンステストを実行
+	@echo "パフォーマンステストを実行中..."
+	go test -v -bench=. -benchmem ./tests/performance/...
+
+.PHONY: test-security
+test-security: ## セキュリティテストを実行
+	@echo "セキュリティテストを実行中..."
+	go test -v ./tests/security/...
+
+# Dockerコンテナ環境でのテスト実行
+.PHONY: test-in-container
+test-in-container: ## Dockerコンテナ内でテストを実行
+	@echo "Dockerコンテナ内でテストを実行中..."
+	docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+.PHONY: test-integration-container
+test-integration-container: ## Dockerコンテナ環境で統合テストを実行
+	@echo "Dockerコンテナ環境で統合テストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-integration
+
+.PHONY: test-e2e-container
+test-e2e-container: ## Dockerコンテナ環境でE2Eテストを実行
+	@echo "Dockerコンテナ環境でE2Eテストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-e2e
+
+.PHONY: test-performance-container
+test-performance-container: ## Dockerコンテナ環境でパフォーマンステストを実行
+	@echo "Dockerコンテナ環境でパフォーマンステストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-performance
+
+.PHONY: test-coverage-container
+test-coverage-container: ## Dockerコンテナ環境でカバレッジテストを実行
+	@echo "Dockerコンテナ環境でカバレッジテストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-coverage
 ```
 
 ### 8.2 カバレッジ設定
@@ -852,28 +1425,192 @@ module.exports = {
 ```
 
 ### 8.3 テストレポート
-```javascript
-// tests/report-generator.js
-class TestReportGenerator {
-  static generateReport(testResults) {
-    return {
-      summary: {
-        total: testResults.numTotalTests,
-        passed: testResults.numPassedTests,
-        failed: testResults.numFailedTests,
-        coverage: testResults.coverage
-      },
-      performance: {
-        averageResponseTime: testResults.avgResponseTime,
-        throughput: testResults.throughput,
-        errorRate: testResults.errorRate
-      },
-      security: {
-        vulnerabilities: testResults.vulnerabilities,
-        authenticationTests: testResults.authTests,
-        authorizationTests: testResults.authzTests
-      }
-    };
-  }
+```go
+// tests/report/report_generator.go
+package report
+
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+    "time"
+)
+
+type TestReport struct {
+    Summary struct {
+        Total  int     `json:"total"`
+        Passed int     `json:"passed"`
+        Failed int     `json:"failed"`
+        Coverage float64 `json:"coverage"`
+    } `json:"summary"`
+    Performance struct {
+        AverageResponseTime float64 `json:"average_response_time"`
+        Throughput         float64 `json:"throughput"`
+        ErrorRate          float64 `json:"error_rate"`
+    } `json:"performance"`
+    Security struct {
+        Vulnerabilities     []string `json:"vulnerabilities"`
+        AuthenticationTests int      `json:"authentication_tests"`
+        AuthorizationTests  int      `json:"authorization_tests"`
+    } `json:"security"`
+    Timestamp time.Time `json:"timestamp"`
 }
+
+type TestReportGenerator struct{}
+
+func (g *TestReportGenerator) GenerateReport(testResults map[string]interface{}) *TestReport {
+    report := &TestReport{
+        Timestamp: time.Now(),
+    }
+    
+    // サマリー情報を設定
+    if summary, ok := testResults["summary"].(map[string]interface{}); ok {
+        report.Summary.Total = int(summary["total"].(float64))
+        report.Summary.Passed = int(summary["passed"].(float64))
+        report.Summary.Failed = int(summary["failed"].(float64))
+        report.Summary.Coverage = summary["coverage"].(float64)
+    }
+    
+    // パフォーマンス情報を設定
+    if performance, ok := testResults["performance"].(map[string]interface{}); ok {
+        report.Performance.AverageResponseTime = performance["average_response_time"].(float64)
+        report.Performance.Throughput = performance["throughput"].(float64)
+        report.Performance.ErrorRate = performance["error_rate"].(float64)
+    }
+    
+    // セキュリティ情報を設定
+    if security, ok := testResults["security"].(map[string]interface{}); ok {
+        if vulnerabilities, ok := security["vulnerabilities"].([]interface{}); ok {
+            for _, v := range vulnerabilities {
+                report.Security.Vulnerabilities = append(report.Security.Vulnerabilities, v.(string))
+            }
+        }
+        report.Security.AuthenticationTests = int(security["authentication_tests"].(float64))
+        report.Security.AuthorizationTests = int(security["authorization_tests"].(float64))
+    }
+    
+    return report
+}
+
+func (g *TestReportGenerator) SaveReport(report *TestReport, filename string) error {
+    data, err := json.MarshalIndent(report, "", "  ")
+    if err != nil {
+        return fmt.Errorf("failed to marshal report: %w", err)
+    }
+    
+    return os.WriteFile(filename, data, 0644)
+}
+```
+
+### 8.4 Dockerコンテナ環境でのテスト実行ガイド
+
+#### 8.4.1 テスト環境の準備
+```bash
+# 開発環境を起動
+make dev-up
+
+# テスト用データベースの準備
+docker-compose exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_test;"
+docker-compose exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_e2e;"
+docker-compose exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_perf;"
+docker-compose exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_security;"
+```
+
+#### 8.4.2 テスト実行コマンド
+```bash
+# すべてのテストを実行
+make test-all
+
+# 単体テストのみ実行
+make test-unit
+
+# 統合テストのみ実行
+make test-integration
+
+# E2Eテストのみ実行
+make test-e2e
+
+# パフォーマンステストのみ実行
+make test-performance
+
+# セキュリティテストのみ実行
+make test-security
+
+# カバレッジテスト実行
+make test-coverage
+```
+
+#### 8.4.3 Dockerコンテナ内でのテスト実行
+```bash
+# Dockerコンテナ内でテストを実行
+make test-in-container
+
+# 特定のテストをコンテナ内で実行
+make test-integration-container
+make test-e2e-container
+make test-performance-container
+make test-coverage-container
+```
+
+#### 8.4.4 テスト結果の確認
+```bash
+# テストログの確認
+docker-compose logs test-runner
+
+# カバレッジレポートの確認
+open coverage.html
+
+# テストレポートの確認
+cat test-report.json
+```
+
+#### 8.4.5 CI/CDパイプラインでのテスト実行
+```yaml
+# .github/workflows/test.yml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: access_log_tracker_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Run tests
+      run: |
+        make test-all
+        make test-coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
 ``` 
