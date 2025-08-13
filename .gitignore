@@ -20,7 +20,7 @@ go.work
 # Environment variables
 .env
 .env.local
-.env.production
+.env.*.local
 
 # IDE files
 .vscode/
@@ -43,28 +43,50 @@ Thumbs.db
 logs/
 
 # Build artifacts
-build/
-dist/
 bin/
+tmp/
+dist/
 
-# Docker
-.dockerignore
+# Air temporary files
+tmp/
 
-# Kubernetes
-*.kubeconfig
+# Coverage reports
+coverage.out
+coverage.html
 
-# Terraform
+# Docker volumes
+docker-volumes/
+
+# Database files
+*.db
+*.sqlite
+
+# Backup files
+backups/
+
+# Terraform files
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl
 
-# Node.js (for frontend assets)
+# Kubernetes files
+*.kubeconfig
+
+# AWS credentials
+.aws/
+
+# SSH keys
+.ssh/
+
+# Node modules (if any frontend tools are used)
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Yarn cache
+.yarn-cache/
+
+# npm cache
+.npm/
 
 # Temporary files
-tmp/
-temp/
+*.tmp
+*.temp

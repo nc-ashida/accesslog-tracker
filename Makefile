@@ -30,23 +30,38 @@ dev-up: ## 開発環境を起動
 	@echo "開発環境を起動中..."
 	docker-compose up -d
 	@echo "開発環境が起動しました"
-	@echo "PostgreSQL: localhost:5432"
-	@echo "Redis: localhost:6379"
-	@echo "pgAdmin: http://localhost:8081"
-	@echo "Redis Commander: http://localhost:8082"
-	@echo "Prometheus: http://localhost:9090"
-	@echo "Grafana: http://localhost:3000"
+	@echo "アプリケーション: http://localhost:8080"
+	@echo "PostgreSQL: localhost:18432"
+	@echo "Redis: localhost:16379"
+	@echo "pgAdmin: http://localhost:18081"
+	@echo "Redis Commander: http://localhost:18082"
+	@echo "Prometheus: http://localhost:19090"
+	@echo "Grafana: http://localhost:13000"
 	@echo "Jaeger: http://localhost:16686"
-	@echo "Mailhog: http://localhost:8025"
+	@echo "Mailhog: http://localhost:18025"
+
+.PHONY: dev-up-app
+dev-up-app: ## アプリケーションのみを起動（ホットリロード）
+	@echo "アプリケーションを起動中（ホットリロード）..."
+	docker-compose up app
+
+.PHONY: dev-shell
+dev-shell: ## 開発コンテナにシェルで接続
+	@echo "開発コンテナに接続中..."
+	docker-compose run --rm builder /bin/sh
+
+.PHONY: dev-logs
+dev-logs: ## 開発環境のログを表示
+	docker-compose logs -f
+
+.PHONY: dev-logs-app
+dev-logs-app: ## アプリケーションのログを表示
+	docker-compose logs -f app
 
 .PHONY: dev-down
 dev-down: ## 開発環境を停止
 	@echo "開発環境を停止中..."
 	docker-compose down
-
-.PHONY: dev-logs
-dev-logs: ## 開発環境のログを表示
-	docker-compose logs -f
 
 .PHONY: dev-clean
 dev-clean: ## 開発環境をクリーンアップ
@@ -71,7 +86,13 @@ deps-update: ## 依存関係を更新
 .PHONY: build
 build: ## アプリケーションをビルド
 	@echo "アプリケーションをビルド中..."
+	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/api $(LDFLAGS) ./cmd/api
+
+.PHONY: build-container
+build-container: ## コンテナ内でアプリケーションをビルド
+	@echo "コンテナ内でアプリケーションをビルド中..."
+	docker-compose run --rm builder make build
 
 .PHONY: build-all
 build-all: ## すべてのバイナリをビルド
@@ -80,6 +101,11 @@ build-all: ## すべてのバイナリをビルド
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/api $(LDFLAGS) ./cmd/api
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/worker $(LDFLAGS) ./cmd/worker
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/beacon-generator $(LDFLAGS) ./cmd/beacon-generator
+
+.PHONY: build-all-container
+build-all-container: ## コンテナ内ですべてのバイナリをビルド
+	@echo "コンテナ内ですべてのバイナリをビルド中..."
+	docker-compose run --rm builder make build-all
 
 .PHONY: build-docker
 build-docker: ## Dockerイメージをビルド
@@ -93,20 +119,37 @@ test: ## テストを実行
 	@echo "テストを実行中..."
 	go test -v ./...
 
+.PHONY: test-container
+test-container: ## コンテナ内でテストを実行
+	@echo "コンテナ内でテストを実行中..."
+	docker-compose -f docker-compose.test.yml --profile test run --rm test-runner make test
+
 .PHONY: test-all
 test-all: ## すべてのテストを実行
 	@echo "すべてのテストを実行中..."
-	go test -v ./...
+	make test-unit
+	make test-integration
+	make test-e2e
+	make test-performance
+	make test-security
+	make test-coverage
+
+.PHONY: test-all-container
+test-all-container: ## コンテナ内ですべてのテストを実行
+	@echo "コンテナ内ですべてのテストを実行中..."
+	docker-compose -f docker-compose.test.yml --profile test run --rm test-runner make test-all
 
 .PHONY: test-unit
 test-unit: ## 単体テストを実行
 	@echo "単体テストを実行中..."
+	go test -v ./tests/unit/...
 	go test -v ./internal/domain/...
 	go test -v ./internal/utils/...
 
 .PHONY: test-integration
 test-integration: ## 統合テストを実行
 	@echo "統合テストを実行中..."
+	go test -v ./tests/integration/...
 	go test -v ./internal/infrastructure/...
 	go test -v ./internal/api/...
 
@@ -156,7 +199,23 @@ test-integration-container: ## Dockerコンテナ環境で統合テストを実�
 .PHONY: test-e2e-container
 test-e2e-container: ## Dockerコンテナ環境でE2Eテストを実行
 	@echo "Dockerコンテナ環境でE2Eテストを実行中..."
-	docker-compose -f docker-compose.test.yml run --rm test-runner make test-e2e
+	docker-compose -f docker-compose.test.yml --profile e2e up --build --abort-on-container-exit
+
+.PHONY: test-e2e-setup
+test-e2e-setup: ## E2Eテスト環境をセットアップ
+	@echo "E2Eテスト環境をセットアップ中..."
+	docker-compose -f docker-compose.test.yml --profile e2e up -d postgres redis
+	@echo "E2Eテスト環境のセットアップが完了しました"
+
+.PHONY: test-e2e-run
+test-e2e-run: ## E2Eテストを実行（環境は起動済み）
+	@echo "E2Eテストを実行中..."
+	docker-compose -f docker-compose.test.yml --profile e2e run --rm test-runner make test-e2e
+
+.PHONY: test-e2e-cleanup
+test-e2e-cleanup: ## E2Eテスト環境をクリーンアップ
+	@echo "E2Eテスト環境をクリーンアップ中..."
+	docker-compose -f docker-compose.test.yml --profile e2e down -v
 
 .PHONY: test-performance-container
 test-performance-container: ## Dockerコンテナ環境でパフォーマンステストを実行
@@ -183,10 +242,20 @@ lint: ## コードをリント
 	@echo "コードをリント中..."
 	golangci-lint run
 
+.PHONY: lint-container
+lint-container: ## コンテナ内でコードをリント
+	@echo "コンテナ内でコードをリント中..."
+	docker-compose run --rm builder golangci-lint run
+
 .PHONY: fmt
 fmt: ## コードをフォーマット
 	@echo "コードをフォーマット中..."
 	go fmt ./...
+
+.PHONY: fmt-container
+fmt-container: ## コンテナ内でコードをフォーマット
+	@echo "コンテナ内でコードをフォーマット中..."
+	docker-compose run --rm builder go fmt ./...
 
 .PHONY: fmt-check
 fmt-check: ## フォーマットをチェック
@@ -196,6 +265,11 @@ fmt-check: ## フォーマットをチェック
 		gofmt -l .; \
 		exit 1; \
 	fi
+
+.PHONY: fmt-check-container
+fmt-check-container: ## コンテナ内でフォーマットをチェック
+	@echo "コンテナ内でフォーマットをチェック中..."
+	docker-compose run --rm builder make fmt-check
 
 # データベース
 .PHONY: migrate

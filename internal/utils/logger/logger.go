@@ -1,148 +1,163 @@
 package logger
 
 import (
+	"errors"
+	"io"
 	"os"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-// Logger はアプリケーション全体で使用するロガーのインスタンス
-var Logger *logrus.Logger
-
-// Config はロガーの設定を定義
-type Config struct {
-	Level  string `json:"level"`
-	Format string `json:"format"`
-	Output string `json:"output"`
+// Logger はログ機能を提供するインターフェースです
+type Logger interface {
+	Debug(args ...interface{})
+	Info(args ...interface{})
+	Warn(args ...interface{})
+	Error(args ...interface{})
+	Fatal(args ...interface{})
+	Panic(args ...interface{})
+	
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Panicf(format string, args ...interface{})
+	
+	WithField(key string, value interface{}) Logger
+	WithFields(fields map[string]interface{}) Logger
+	WithError(err error) Logger
+	
+	SetLevel(level string) error
+	SetFormat(format string) error
+	SetOutput(output io.Writer)
 }
 
-// Init はロガーを初期化します
-func Init(config Config) error {
-	Logger = logrus.New()
+// logger はLoggerインターフェースの実装です
+type logger struct {
+	entry *logrus.Entry
+}
 
-	// ログレベルの設定
-	level, err := logrus.ParseLevel(config.Level)
-	if err != nil {
-		level = logrus.InfoLevel
-	}
-	Logger.SetLevel(level)
+// NewLogger は新しいロガーインスタンスを作成します
+func NewLogger() Logger {
+	l := logrus.New()
+	l.SetOutput(os.Stdout)
+	l.SetLevel(logrus.InfoLevel)
+	l.SetFormatter(&logrus.JSONFormatter{})
+	
+	return &logger{entry: logrus.NewEntry(l)}
+}
 
-	// ログフォーマットの設定
-	switch config.Format {
-	case "json":
-		Logger.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-			FieldMap: logrus.FieldMap{
-				logrus.FieldKeyTime:  "timestamp",
-				logrus.FieldKeyLevel: "level",
-				logrus.FieldKeyMsg:   "message",
-			},
-		})
-	case "text":
-		Logger.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: time.RFC3339,
-		})
+// SetLevel はログレベルを設定します
+func (l *logger) SetLevel(level string) error {
+	switch level {
+	case "debug":
+		l.entry.Logger.SetLevel(logrus.DebugLevel)
+	case "info":
+		l.entry.Logger.SetLevel(logrus.InfoLevel)
+	case "warn":
+		l.entry.Logger.SetLevel(logrus.WarnLevel)
+	case "error":
+		l.entry.Logger.SetLevel(logrus.ErrorLevel)
+	case "fatal":
+		l.entry.Logger.SetLevel(logrus.FatalLevel)
+	case "panic":
+		l.entry.Logger.SetLevel(logrus.PanicLevel)
 	default:
-		Logger.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		})
+		return errors.New("invalid log level")
 	}
-
-	// ログ出力先の設定
-	switch config.Output {
-	case "stdout":
-		Logger.SetOutput(os.Stdout)
-	case "stderr":
-		Logger.SetOutput(os.Stderr)
-	case "file":
-		file, err := os.OpenFile("logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return err
-		}
-		Logger.SetOutput(file)
-	default:
-		Logger.SetOutput(os.Stdout)
-	}
-
 	return nil
 }
 
-// GetLogger はロガーインスタンスを取得します
-func GetLogger() *logrus.Logger {
-	if Logger == nil {
-		// デフォルト設定で初期化
-		Init(Config{
-			Level:  "info",
-			Format: "json",
-			Output: "stdout",
-		})
+// SetFormat はログフォーマットを設定します
+func (l *logger) SetFormat(format string) error {
+	switch format {
+	case "json":
+		l.entry.Logger.SetFormatter(&logrus.JSONFormatter{})
+	case "text":
+		l.entry.Logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		return errors.New("invalid log format")
 	}
-	return Logger
+	return nil
 }
 
-// WithField はフィールド付きのロガーを返します
-func WithField(key string, value interface{}) *logrus.Entry {
-	return GetLogger().WithField(key, value)
+// SetOutput はログ出力先を設定します
+func (l *logger) SetOutput(output io.Writer) {
+	l.entry.Logger.SetOutput(output)
 }
 
-// WithFields は複数フィールド付きのロガーを返します
-func WithFields(fields logrus.Fields) *logrus.Entry {
-	return GetLogger().WithFields(fields)
+// WithField は単一のフィールドを追加したロガーを返します
+func (l *logger) WithField(key string, value interface{}) Logger {
+	return &logger{entry: l.entry.WithField(key, value)}
 }
 
-// WithError はエラー付きのロガーを返します
-func WithError(err error) *logrus.Entry {
-	return GetLogger().WithError(err)
+// WithFields は複数のフィールドを追加したロガーを返します
+func (l *logger) WithFields(fields map[string]interface{}) Logger {
+	return &logger{entry: l.entry.WithFields(logrus.Fields(fields))}
+}
+
+// WithError はエラーを追加したロガーを返します
+func (l *logger) WithError(err error) Logger {
+	return &logger{entry: l.entry.WithError(err)}
 }
 
 // Debug はデバッグレベルのログを出力します
-func Debug(args ...interface{}) {
-	GetLogger().Debug(args...)
+func (l *logger) Debug(args ...interface{}) {
+	l.entry.Debug(args...)
 }
 
 // Info は情報レベルのログを出力します
-func Info(args ...interface{}) {
-	GetLogger().Info(args...)
+func (l *logger) Info(args ...interface{}) {
+	l.entry.Info(args...)
 }
 
 // Warn は警告レベルのログを出力します
-func Warn(args ...interface{}) {
-	GetLogger().Warn(args...)
+func (l *logger) Warn(args ...interface{}) {
+	l.entry.Warn(args...)
 }
 
 // Error はエラーレベルのログを出力します
-func Error(args ...interface{}) {
-	GetLogger().Error(args...)
+func (l *logger) Error(args ...interface{}) {
+	l.entry.Error(args...)
 }
 
 // Fatal は致命的エラーレベルのログを出力し、アプリケーションを終了します
-func Fatal(args ...interface{}) {
-	GetLogger().Fatal(args...)
+func (l *logger) Fatal(args ...interface{}) {
+	l.entry.Fatal(args...)
+}
+
+// Panic はパニックレベルのログを出力し、パニックを発生させます
+func (l *logger) Panic(args ...interface{}) {
+	l.entry.Panic(args...)
 }
 
 // Debugf はデバッグレベルのフォーマット付きログを出力します
-func Debugf(format string, args ...interface{}) {
-	GetLogger().Debugf(format, args...)
+func (l *logger) Debugf(format string, args ...interface{}) {
+	l.entry.Debugf(format, args...)
 }
 
 // Infof は情報レベルのフォーマット付きログを出力します
-func Infof(format string, args ...interface{}) {
-	GetLogger().Infof(format, args...)
+func (l *logger) Infof(format string, args ...interface{}) {
+	l.entry.Infof(format, args...)
 }
 
 // Warnf は警告レベルのフォーマット付きログを出力します
-func Warnf(format string, args ...interface{}) {
-	GetLogger().Warnf(format, args...)
+func (l *logger) Warnf(format string, args ...interface{}) {
+	l.entry.Warnf(format, args...)
 }
 
 // Errorf はエラーレベルのフォーマット付きログを出力します
-func Errorf(format string, args ...interface{}) {
-	GetLogger().Errorf(format, args...)
+func (l *logger) Errorf(format string, args ...interface{}) {
+	l.entry.Errorf(format, args...)
 }
 
 // Fatalf は致命的エラーレベルのフォーマット付きログを出力し、アプリケーションを終了します
-func Fatalf(format string, args ...interface{}) {
-	GetLogger().Fatalf(format, args...)
+func (l *logger) Fatalf(format string, args ...interface{}) {
+	l.entry.Fatalf(format, args...)
+}
+
+// Panicf はパニックレベルのフォーマット付きログを出力し、パニックを発生させます
+func (l *logger) Panicf(format string, args ...interface{}) {
+	l.entry.Panicf(format, args...)
 }

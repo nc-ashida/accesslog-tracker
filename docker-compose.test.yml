@@ -14,6 +14,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=
+      - APP_ENV=test
+      - CGO_ENABLED=0
+      - GOOS=linux
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,8 +25,39 @@ services:
     volumes:
       - ./:/app
       - /app/vendor
+      - ~/.ssh:/root/.ssh:ro
+      - go-cache:/go
     networks:
       - test-network
+    profiles:
+      - test
+
+  test-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: access-log-tracker-test-app
+    environment:
+      - APP_ENV=test
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=access_log_tracker_test
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - e2e
 
   postgres:
     image: postgres:15-alpine
@@ -31,10 +65,12 @@ services:
       POSTGRES_DB: access_log_tracker_test
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "18433:5432"
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
+      - ./deployments/database/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d access_log_tracker_test"]
       interval: 10s
@@ -45,8 +81,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ""
     ports:
       - "16380:6379"
+    volumes:
+      - redis_test_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -57,6 +96,11 @@ services:
 
 volumes:
   postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  go-cache:
+    driver: local
 
 networks:
   test-network:

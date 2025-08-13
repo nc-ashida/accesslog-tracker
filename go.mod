@@ -1,4 +1,4 @@
-module github.com/your-username/accesslog-tracker
+module github.com/nc-ashida/accesslog-tracker
 
 go 1.21
 
@@ -12,6 +12,7 @@ require (
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/crypto v0.14.0
 	gorm.io/gorm v1.30.1
 )
 
@@ -45,7 +46,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.5.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.20.0 // indirect

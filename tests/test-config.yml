@@ -1,0 +1,159 @@
+# テスト設定ファイル
+# 各種テストの設定を管理
+
+# データベース設定
+database:
+  test:
+    host: "localhost"
+    port: 5432
+    name: "access_log_tracker_test"
+    user: "postgres"
+    password: "password"
+    sslmode: "disable"
+  
+  e2e:
+    host: "localhost"
+    port: 5432
+    name: "access_log_tracker_e2e"
+    user: "postgres"
+    password: "password"
+    sslmode: "disable"
+  
+  performance:
+    host: "localhost"
+    port: 5432
+    name: "access_log_tracker_perf"
+    user: "postgres"
+    password: "password"
+    sslmode: "disable"
+  
+  security:
+    host: "localhost"
+    port: 5432
+    name: "access_log_tracker_security"
+    user: "postgres"
+    password: "password"
+    sslmode: "disable"
+
+# Redis設定
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+# API設定
+api:
+  base_url: "http://localhost:8080"
+  timeout: 30s
+  retry_count: 3
+
+# テスト設定
+test:
+  # 単体テスト
+  unit:
+    timeout: 30s
+    parallel: 4
+  
+  # 統合テスト
+  integration:
+    timeout: 60s
+    parallel: 2
+    setup_timeout: 30s
+    teardown_timeout: 30s
+  
+  # E2Eテスト
+  e2e:
+    timeout: 120s
+    parallel: 1
+    setup_timeout: 60s
+    teardown_timeout: 60s
+  
+  # パフォーマンステスト
+  performance:
+    timeout: 300s
+    parallel: 1
+    warmup_duration: 30s
+    test_duration: 60s
+    target_rps: 100
+    max_latency_p95: 200ms
+    max_latency_p99: 500ms
+  
+  # セキュリティテスト
+  security:
+    timeout: 180s
+    parallel: 1
+    rate_limit_threshold: 100
+    sql_injection_payloads:
+      - "'; DROP TABLE applications; --"
+      - "' OR '1'='1"
+      - "'; INSERT INTO applications VALUES (999, 'hacked', 'hacked', 'hacked'); --"
+    xss_payloads:
+      - "<script>alert('XSS')</script>"
+      - "<img src=x onerror=alert('XSS')>"
+      - "javascript:alert('XSS')"
+
+# テストデータ設定
+test_data:
+  applications:
+    - name: "Test Application 1"
+      description: "Test application for unit tests"
+      domain: "test1.example.com"
+    - name: "Test Application 2"
+      description: "Test application for integration tests"
+      domain: "test2.example.com"
+    - name: "Test Application 3"
+      description: "Test application for E2E tests"
+      domain: "test3.example.com"
+  
+  sessions:
+    - session_id: "test-session-001"
+      user_agent: "Mozilla/5.0 (Test Browser) AppleWebKit/537.36"
+      ip_address: "192.168.1.100"
+    - session_id: "test-session-002"
+      user_agent: "Mozilla/5.0 (Test Browser) AppleWebKit/537.36"
+      ip_address: "192.168.1.101"
+  
+  access_logs:
+    - url: "/home"
+      referrer: "https://google.com"
+      user_agent: "Mozilla/5.0 (Test Browser) AppleWebKit/537.36"
+      ip_address: "192.168.1.100"
+    - url: "/about"
+      referrer: "https://example.com"
+      user_agent: "Mozilla/5.0 (Test Browser) AppleWebKit/537.36"
+      ip_address: "192.168.1.101"
+    - url: "/contact"
+      referrer: "https://bing.com"
+      user_agent: "Mozilla/5.0 (Test Browser) AppleWebKit/537.36"
+      ip_address: "192.168.1.102"
+
+# ログ設定
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  test_logs: true
+
+# カバレッジ設定
+coverage:
+  enabled: true
+  output_format: "html"
+  output_file: "coverage.html"
+  threshold: 80
+  exclude_patterns:
+    - "vendor/*"
+    - "cmd/*"
+    - "tests/*"
+    - "*.pb.go"
+    - "*.gen.go"
+
+# レポート設定
+reports:
+  enabled: true
+  output_dir: "test-reports"
+  formats:
+    - "json"
+    - "html"
+    - "junit"
+  retention_days: 30

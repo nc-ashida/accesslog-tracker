@@ -1,6 +1,59 @@
 version: '3.8'
 
 services:
+  # アプリケーション
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: access-log-tracker-app
+    environment:
+      - APP_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=access_log_tracker
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/app
+      - /app/vendor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - access-log-tracker-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 開発用ビルドサービス
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: access-log-tracker-builder
+    volumes:
+      - ./:/app
+      - /app/vendor
+      - go-cache:/go
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    networks:
+      - access-log-tracker-network
+    profiles:
+      - build
+
   # PostgreSQL データベース
   postgres:
     image: postgres:15-alpine
@@ -140,6 +193,8 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  go-cache:
     driver: local
 
 networks:

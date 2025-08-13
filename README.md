@@ -1,273 +1,280 @@
 # Access Log Tracker
 
-高性能なWebアクセスログトラッキングシステムです。リアルタイムでのアクセス分析、カスタムパラメータの追跡、Webhook通知機能を提供します。
+アクセスログトラッキングシステムのDocker環境
 
-## 機能
+## 概要
 
-- **リアルタイムトラッキング**: JavaScriptビーコンによる軽量なアクセスログ収集
-- **カスタムパラメータ**: 柔軟なカスタムデータの追跡
-- **統計分析**: リアルタイムでのアクセス統計とレポート
-- **Webhook通知**: イベント発生時の自動通知
-- **高可用性**: マイクロサービスアーキテクチャによるスケーラブルな設計
-- **監視・メトリクス**: Prometheus、Grafana、CloudWatchによる包括的な監視
+このプロジェクトは、Webサイトのアクセスログを収集・分析するためのトラッキングシステムです。Dockerを使用して開発・テスト・本番環境を統一し、TDD（テスト駆動開発）を徹底した高品質なシステムを構築します。
 
-## アーキテクチャ
+## 前提条件
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Client    │    │   Mobile App    │    │   API Client    │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          └──────────────────────┼──────────────────────┘
-                                 │
-                    ┌─────────────▼─────────────┐
-                    │    Load Balancer (ALB)    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   API Gateway (CloudFront)│
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   API Server (Go/Gin)     │
-                    └─────────────┬─────────────┘
-                                  │
-          ┌───────────────────────┼───────────────────────┐
-          │                       │                       │
-┌─────────▼─────────┐  ┌─────────▼─────────┐  ┌─────────▼─────────┐
-│   PostgreSQL      │  │   Redis Cache     │  │   S3 Storage      │
-│   (Primary DB)    │  │   (Session/Stats) │  │   (Assets)        │
-└───────────────────┘  └───────────────────┘  └───────────────────┘
-```
-
-## 技術スタック
-
-### バックエンド
-- **言語**: Go 1.21+
-- **Webフレームワーク**: Gin
-- **データベース**: PostgreSQL
-- **キャッシュ**: Redis
-- **認証**: JWT
-- **メトリクス**: Prometheus
-
-### インフラストラクチャ
-- **コンテナ**: Docker
-- **オーケストレーション**: Kubernetes
-- **クラウド**: AWS (EC2, RDS, ElastiCache, S3, CloudFront)
-- **監視**: CloudWatch, Grafana
+- Docker
+- Docker Compose
+- Make
 
 ## クイックスタート
 
-### 前提条件
-
-- Go 1.21以上
-- Docker & Docker Compose
-- PostgreSQL 14以上
-- Redis 6以上
-
-### 1. リポジトリのクローン
+### 1. 開発環境のセットアップ
 
 ```bash
-git clone https://github.com/your-org/access-log-tracker.git
-cd access-log-tracker
+# 環境変数ファイルを作成
+make dev-setup
+
+# 開発環境を起動
+make dev-up
 ```
 
-### 2. 環境設定
+### 2. アプリケーションの起動（ホットリロード）
 
 ```bash
-cp env.example .env
-# .envファイルを編集して環境変数を設定
+# アプリケーションのみを起動（コード変更時に自動リロード）
+make dev-up-app
 ```
 
-### 3. 依存関係のインストール
+### 3. テストの実行
 
 ```bash
-go mod download
+# すべてのテストを実行
+make test-all-container
+
+# 単体テストのみ実行
+make test-unit
+
+# E2Eテストを実行
+make test-e2e-container
 ```
 
-### 4. 開発環境の起動
+## 利用可能なコマンド
+
+### 開発環境
 
 ```bash
-# Docker Composeで開発環境を起動
-docker-compose up -d
-
-# データベースマイグレーション
-make migrate
-
-# アプリケーションの起動
-make run
+make dev-setup          # 開発環境をセットアップ
+make dev-up             # 開発環境を起動
+make dev-up-app         # アプリケーションのみを起動（ホットリロード）
+make dev-shell          # 開発コンテナにシェルで接続
+make dev-logs           # 開発環境のログを表示
+make dev-logs-app       # アプリケーションのログを表示
+make dev-down           # 開発環境を停止
+make dev-clean          # 開発環境をクリーンアップ
 ```
 
-### 5. 動作確認
+### ビルド
 
 ```bash
-# ヘルスチェック
-curl http://localhost:8080/health
-
-# APIドキュメント
-open http://localhost:8080/docs
-```
-
-## 開発
-
-### プロジェクト構造
-
-```
-access-log-tracker/
-├── cmd/                    # エントリーポイント
-│   ├── api/               # APIサーバー
-│   ├── worker/            # バッチワーカー
-│   └── beacon-generator/  # ビーコン生成ツール
-├── internal/              # 内部パッケージ
-│   ├── api/              # API層
-│   ├── domain/           # ドメイン層
-│   ├── infrastructure/   # インフラ層
-│   └── utils/            # ユーティリティ
-├── web/                  # フロントエンド
-├── tests/                # テスト
-├── deployments/          # デプロイメント設定
-├── monitoring/           # 監視設定
-└── docs/                # ドキュメント
-```
-
-### 開発コマンド
-
-```bash
-# アプリケーションの起動
-make run
-
-# テストの実行
-make test
-
-# ビルド
-make build
-
-# リント
-make lint
-
-# フォーマット
-make fmt
-
-# カバレッジレポート
-make coverage
+make build              # ローカルでビルド
+make build-container    # コンテナ内でビルド
+make build-all          # すべてのバイナリをローカルでビルド
+make build-all-container # すべてのバイナリをコンテナ内でビルド
+make build-docker       # Dockerイメージをビルド
 ```
 
 ### テスト
 
 ```bash
-# 単体テスト
-go test ./...
-
-# 統合テスト
-go test ./tests/integration/...
-
-# E2Eテスト
-go test ./tests/e2e/...
-
-# カバレッジ
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+make test               # ローカルでテスト実行
+make test-container     # コンテナ内でテスト実行
+make test-all           # すべてのテストをローカルで実行
+make test-all-container # すべてのテストをコンテナ内で実行
+make test-unit          # 単体テストを実行
+make test-integration   # 統合テストを実行
+make test-e2e           # E2Eテストを実行
+make test-e2e-container # E2Eテストをコンテナ環境で実行
+make test-performance   # パフォーマンステストを実行
+make test-security      # セキュリティテストを実行
+make test-coverage      # テストカバレッジを実行
 ```
 
-## デプロイメント
-
-### Docker
+### コード品質
 
 ```bash
-# イメージのビルド
-docker build -t access-log-tracker .
-
-# コンテナの起動
-docker run -p 8080:8080 access-log-tracker
+make lint               # ローカルでリント実行
+make lint-container     # コンテナ内でリント実行
+make fmt                # ローカルでフォーマット
+make fmt-container      # コンテナ内でフォーマット
+make fmt-check          # ローカルでフォーマットチェック
+make fmt-check-container # コンテナ内でフォーマットチェック
 ```
 
-### Kubernetes
+### データベース
 
 ```bash
-# デプロイメント
-kubectl apply -f deployments/kubernetes/
-
-# サービスの確認
-kubectl get services
-
-# ログの確認
-kubectl logs -f deployment/access-log-tracker
+make migrate            # マイグレーションを実行
+make migrate-create     # 新しいマイグレーションファイルを作成
 ```
 
-### AWS
+## 環境構成
+
+### 開発環境（docker-compose.yml）
+
+- **アプリケーション**: http://localhost:8080
+- **PostgreSQL**: localhost:18432
+- **Redis**: localhost:16379
+- **pgAdmin**: http://localhost:18081
+- **Redis Commander**: http://localhost:18082
+- **Prometheus**: http://localhost:19090
+- **Grafana**: http://localhost:13000
+- **Jaeger**: http://localhost:16686
+- **Mailhog**: http://localhost:18025
+
+### テスト環境（docker-compose.test.yml）
+
+- **テスト用PostgreSQL**: localhost:18433
+- **テスト用Redis**: localhost:16380
+- **テスト用アプリケーション**: http://localhost:8081
+
+## プロファイル
+
+### 開発プロファイル
 
 ```bash
-# CloudFormationでデプロイ
-aws cloudformation deploy \
-  --template-file deployments/aws/cloudformation/infrastructure.yml \
-  --stack-name access-log-tracker \
-  --capabilities CAPABILITY_IAM
+# 全サービスを起動
+docker-compose up -d
 
-# Terraformでデプロイ
-cd deployments/aws/terraform
-terraform init
-terraform plan
-terraform apply
+# アプリケーションのみ起動
+docker-compose up app
+
+# ビルドサービスを使用
+docker-compose --profile build run --rm builder make build
 ```
 
-## API ドキュメント
+### テストプロファイル
 
-### トラッキングエンドポイント
+```bash
+# テスト環境を起動
+docker-compose -f docker-compose.test.yml --profile test up -d
 
-```http
-POST /api/v1/track
-Content-Type: application/json
-
-{
-  "application_id": "app_123",
-  "session_id": "sess_456",
-  "page_url": "https://example.com/page",
-  "referrer": "https://google.com",
-  "user_agent": "Mozilla/5.0...",
-  "ip_address": "192.168.1.1",
-  "custom_params": {
-    "user_id": "user_789",
-    "category": "electronics"
-  }
-}
+# E2Eテスト環境を起動
+docker-compose -f docker-compose.test.yml --profile e2e up -d
 ```
 
-### 統計エンドポイント
+## ディレクトリ構造
 
-```http
-GET /api/v1/statistics?application_id=app_123&period=24h
-Authorization: Bearer <token>
+```
+accesslog-tracker/
+├── cmd/                    # アプリケーションエントリーポイント
+├── internal/               # 内部パッケージ
+├── pkg/                    # 公開パッケージ
+├── tests/                  # テストファイル
+├── deployments/            # デプロイメント設定
+├── docs/                   # ドキュメント
+├── docker-compose.yml      # 開発環境設定
+├── docker-compose.test.yml # テスト環境設定
+├── Dockerfile              # 本番用Dockerfile
+├── Dockerfile.dev          # 開発用Dockerfile
+├── Dockerfile.test         # テスト用Dockerfile
+├── .air.toml              # Air設定（ホットリロード）
+├── Makefile               # ビルド・テスト・デプロイスクリプト
+└── README.md              # このファイル
 ```
 
-## 監視・メトリクス
+## 開発ワークフロー
 
-### Prometheus メトリクス
+### 1. 新機能開発
 
-- `http_requests_total`: リクエスト数
-- `http_request_duration_seconds`: レスポンス時間
-- `tracking_events_total`: トラッキングイベント数
-- `database_connections`: データベース接続数
+```bash
+# 開発環境を起動
+make dev-up
 
-### Grafana ダッシュボード
+# アプリケーションをホットリロードで起動
+make dev-up-app
 
-- API パフォーマンス
-- トラッキング統計
-- システムリソース
+# コードを編集（自動リロード）
+# ...
+
+# テストを実行
+make test-all-container
+
+# リントを実行
+make lint-container
+```
+
+### 2. テスト駆動開発（TDD）
+
+```bash
+# テストを先に書く
+# tests/unit/...
+
+# テストを実行（失敗することを確認）
+make test-unit
+
+# 実装を書く
+# internal/...
+
+# テストを再実行（成功することを確認）
+make test-unit
+
+# 統合テストを実行
+make test-integration
+```
+
+### 3. 品質チェック
+
+```bash
+# フォーマットチェック
+make fmt-check-container
+
+# リントチェック
+make lint-container
+
+# セキュリティチェック
+make test-security
+
+# カバレッジチェック
+make test-coverage
+```
+
+## トラブルシューティング
+
+### よくある問題
+
+1. **ポートが既に使用されている**
+   ```bash
+   # 使用中のポートを確認
+   lsof -i :8080
+   
+   # コンテナを停止
+   make dev-down
+   ```
+
+2. **データベース接続エラー**
+   ```bash
+   # データベースの状態を確認
+   docker-compose logs postgres
+   
+   # データベースを再起動
+   docker-compose restart postgres
+   ```
+
+3. **テストが失敗する**
+   ```bash
+   # テスト環境をクリーンアップ
+   make test-e2e-cleanup
+   
+   # テスト環境を再セットアップ
+   make test-e2e-setup
+   ```
+
+### ログの確認
+
+```bash
+# 全サービスのログ
+make dev-logs
+
+# 特定サービスのログ
+docker-compose logs -f app
+docker-compose logs -f postgres
+docker-compose logs -f redis
+```
+
+## 貢献
+
+1. このリポジトリをフォーク
+2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
 
 ## ライセンス
 
-MIT License
-
-## コントリビューション
-
-1. Fork する
-2. フィーチャーブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. Pull Request を作成
-
-## サポート
-
-- ドキュメント: [docs/](docs/)
-- イシュー: [GitHub Issues](https://github.com/your-org/access-log-tracker/issues)
-- ディスカッション: [GitHub Discussions](https://github.com/your-org/access-log-tracker/discussions)
+このプロジェクトはMITライセンスの下で公開されています。
