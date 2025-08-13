@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/models"
 )
 
 const (

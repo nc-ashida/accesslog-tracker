@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/iputil"
+	"accesslog-tracker/internal/utils/iputil"
 )
 
 func TestIPUtil_IsValidIP(t *testing.T) {

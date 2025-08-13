@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/crypto"
+	"accesslog-tracker/internal/utils/crypto"
 )
 
 func TestCryptoUtil_HashSHA256(t *testing.T) {

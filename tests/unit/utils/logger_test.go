@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/logger"
+	"accesslog-tracker/internal/utils/logger"
 )
 
 func TestLogger_NewLogger(t *testing.T) {

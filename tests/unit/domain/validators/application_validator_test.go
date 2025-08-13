@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/validators"
+	"accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/validators"
 )
 
 func TestApplicationValidator_ValidateCreate(t *testing.T) {

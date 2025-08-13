@@ -83,6 +83,27 @@ func ExtractIPFromHeader(headers map[string]string) string {
 	return ""
 }
 
+// GetClientIP はHTTPリクエストからクライアントIPを取得します
+func GetClientIP(headers map[string]string, remoteAddr string) string {
+	// ヘッダーからIPを抽出
+	if ip := ExtractIPFromHeader(headers); ip != "" {
+		return ip
+	}
+	
+	// リモートアドレスからIPを抽出
+	if remoteAddr != "" {
+		// "ip:port"形式からIPを抽出
+		if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
+			ip := remoteAddr[:colonIndex]
+			if IsValidIP(ip) {
+				return ip
+			}
+		}
+	}
+	
+	return ""
+}
+
 // AnonymizeIP はIPアドレスを匿名化します
 func AnonymizeIP(ip string) string {
 	if !IsValidIP(ip) {

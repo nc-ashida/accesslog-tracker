@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/timeutil"
+	"accesslog-tracker/internal/utils/timeutil"
 )
 
 func TestTimeUtil_FormatTimestamp(t *testing.T) {

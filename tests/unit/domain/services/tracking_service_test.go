@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/services"
+	"accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/services"
 )
 
 // MockTrackingRepository はトラッキングリポジトリのモック

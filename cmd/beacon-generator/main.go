@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/beacon/generator"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/logger"
+	"accesslog-tracker/internal/beacon/generator"
+	"accesslog-tracker/internal/utils/logger"
 	"encoding/json"
 	"time"
 	"github.com/sirupsen/logrus"

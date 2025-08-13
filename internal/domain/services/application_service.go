@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/validators"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/crypto"
+	"accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/validators"
+	"accesslog-tracker/internal/utils/crypto"
 )
 
 // ApplicationRepository はアプリケーションリポジトリのインターフェースです

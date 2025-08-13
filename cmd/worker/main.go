@@ -10,9 +10,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/infrastructure/database/postgresql"
-	"github.com/nc-ashida/accesslog-tracker/internal/infrastructure/cache/redis"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/logger"
+	"accesslog-tracker/internal/infrastructure/database/postgresql"
+	"accesslog-tracker/internal/infrastructure/cache/redis"
+	"accesslog-tracker/internal/utils/logger"
 )
 
 var (

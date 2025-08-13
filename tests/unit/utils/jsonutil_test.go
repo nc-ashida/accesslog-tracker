@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/jsonutil"
+	"accesslog-tracker/internal/utils/jsonutil"
 )
 
 func TestJSONUtil_Marshal(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/nc-ashida/accesslog-tracker/internal/config"
+	"accesslog-tracker/internal/config"
 )
 
 func TestConfig_Load(t *testing.T) {

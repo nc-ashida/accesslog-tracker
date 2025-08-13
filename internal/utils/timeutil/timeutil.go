@@ -85,3 +85,17 @@ func IsWithinLastMinutes(t time.Time, minutes int) bool {
 	cutoff := now.Add(-time.Duration(minutes) * time.Minute)
 	return t.After(cutoff)
 }
+
+// ParseDate は日付文字列をパースします（YYYY-MM-DD形式）
+func ParseDate(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, errors.New("empty date string")
+	}
+	
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	
+	return t, nil
+}

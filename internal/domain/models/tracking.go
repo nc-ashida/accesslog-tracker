@@ -99,6 +99,29 @@ func (t *TrackingData) FromJSON(data []byte) error {
 	return json.Unmarshal(data, t)
 }
 
+// TrackingStats はトラッキング統計情報を表すモデルです
+type TrackingStats struct {
+	AppID           string    `json:"app_id"`
+	TotalRequests   int64     `json:"total_requests"`
+	UniqueSessions  int64     `json:"unique_sessions"`
+	UniqueIPs       int64     `json:"unique_ips"`
+	BotRequests     int64     `json:"bot_requests"`
+	MobileRequests  int64     `json:"mobile_requests"`
+	StartDate       time.Time `json:"start_date"`
+	EndDate         time.Time `json:"end_date"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// ToJSON はトラッキング統計をJSONに変換します
+func (t *TrackingStats) ToJSON() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+// FromJSON はJSONからトラッキング統計を復元します
+func (t *TrackingStats) FromJSON(data []byte) error {
+	return json.Unmarshal(data, t)
+}
+
 // IsBot はユーザーエージェントがボットかどうかを判定します
 func (t *TrackingData) IsBot() bool {
 	userAgent := strings.ToLower(t.UserAgent)

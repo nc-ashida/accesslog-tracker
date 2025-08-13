@@ -4,7 +4,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/models"
 )
 
 // ApplicationValidator はアプリケーションのバリデーションを行います

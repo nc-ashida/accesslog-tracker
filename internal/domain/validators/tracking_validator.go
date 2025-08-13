@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/iputil"
+	"accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/utils/iputil"
 )
 
 // TrackingValidator はトラッキングデータのバリデーションを行います

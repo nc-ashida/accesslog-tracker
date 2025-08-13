@@ -36,3 +36,8 @@ var (
 	ErrStatisticsInvalidPeriod     = errors.New("invalid statistics period")
 	ErrStatisticsInvalidMetric     = errors.New("invalid statistics metric")
 )
+
+// バリデーション関連のエラー
+var (
+	ErrValidationError             = errors.New("validation error")
+)

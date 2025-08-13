@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/models"
-	"github.com/nc-ashida/accesslog-tracker/internal/domain/validators"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/iputil"
-	"github.com/nc-ashida/accesslog-tracker/internal/utils/timeutil"
+	"accesslog-tracker/internal/domain/models"
+	"accesslog-tracker/internal/domain/validators"
+	"accesslog-tracker/internal/utils/iputil"
+	"accesslog-tracker/internal/utils/timeutil"
 )
 
 // TrackingRepository はトラッキングリポジトリのインターフェースです
