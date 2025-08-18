@@ -353,7 +353,7 @@ type ApplicationRepository interface {
 ```sql
 -- deployments/database/migrations/001_initial_schema.sql
 -- 初期データベーススキーマ
--- 作成日: 2024年12月
+-- 作成日: 2025年8月
 -- 説明: accesslog-trackerの初期テーブル作成
 
 -- アプリケーションテーブル
