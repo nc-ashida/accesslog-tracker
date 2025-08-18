@@ -139,7 +139,7 @@ accesslog-tracker/
 │   ├── 06f-e2e-tests.md         # E2Eテスト仕様書
 │   ├── 06g-performance-tests.md # パフォーマンステスト仕様書
 │   ├── 06h-security-tests.md    # セキュリティテスト仕様書
-│   └── 35-coverage-80-percent-implementation-plan.md # カバレッジ実装計画
+│   └── 07-coverage-report.md    # カバレッジ実装計画
 ├── docker-compose.yml           # 開発環境用Docker Compose
 ├── docker-compose.test.yml      # テスト環境用Docker Compose
 ├── Dockerfile                   # 本番用Dockerfile
