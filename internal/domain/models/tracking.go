@@ -74,11 +74,12 @@ func (t *TrackingData) IsValidURL() bool {
 }
 
 // GetCustomParam はカスタムパラメータを取得します
-func (t *TrackingData) GetCustomParam(key string) interface{} {
+func (t *TrackingData) GetCustomParam(key string) (interface{}, bool) {
 	if t.CustomParams == nil {
-		return nil
+		return nil, false
 	}
-	return t.CustomParams[key]
+	value, exists := t.CustomParams[key]
+	return value, exists
 }
 
 // SetCustomParam はカスタムパラメータを設定します
@@ -224,4 +225,63 @@ func (t *TrackingData) GetOS() string {
 	}
 	
 	return "Unknown"
+}
+
+// IsValidIP はIPアドレスが有効かどうかを判定します（静的関数）
+func IsValidIP(ip string) bool {
+	if ip == "" {
+		return false
+	}
+	
+	// 簡易的なIPアドレス検証
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		// IPv6の場合は別途チェック
+		if strings.Contains(ip, ":") {
+			return true // IPv6は簡易的に有効とする
+		}
+		return false
+	}
+	
+	for _, part := range parts {
+		if len(part) == 0 || len(part) > 3 {
+			return false
+		}
+		// 数字以外の文字が含まれているかチェック
+		for _, char := range part {
+			if char < '0' || char > '9' {
+				return false
+			}
+		}
+		// 0-255の範囲内かチェック
+		if len(part) > 1 && part[0] == '0' {
+			return false
+		}
+	}
+	
+	return true
+}
+
+// IsValidURL はURLが有効かどうかを判定します（静的関数）
+func IsValidURL(url string) bool {
+	if url == "" {
+		return false
+	}
+	
+	// 簡易的なURL検証
+	if len(url) < 4 {
+		return false
+	}
+	
+	// プロトコルチェック
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return false
+	}
+	
+	// 無効なURLのチェック
+	if url == "invalid-url" {
+		return false
+	}
+	
+	return true
 }

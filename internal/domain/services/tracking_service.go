@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"accesslog-tracker/internal/domain/models"
 	"accesslog-tracker/internal/domain/validators"
 	"accesslog-tracker/internal/utils/iputil"
 	"accesslog-tracker/internal/utils/timeutil"
+
+	"github.com/google/uuid"
 )
 
 // TrackingRepository はトラッキングリポジトリのインターフェースです
@@ -19,6 +20,17 @@ type TrackingRepository interface {
 	GetBySessionID(ctx context.Context, sessionID string) ([]*models.TrackingData, error)
 	CountByAppID(ctx context.Context, appID string) (int64, error)
 	Delete(ctx context.Context, id string) error
+}
+
+// TrackingServiceInterface はトラッキングサービスのインターフェースです
+type TrackingServiceInterface interface {
+	ProcessTrackingData(ctx context.Context, data *models.TrackingData) error
+	GetByID(ctx context.Context, id string) (*models.TrackingData, error)
+	GetByAppID(ctx context.Context, appID string, limit, offset int) ([]*models.TrackingData, error)
+	GetBySessionID(ctx context.Context, sessionID string) ([]*models.TrackingData, error)
+	CountByAppID(ctx context.Context, appID string) (int64, error)
+	Delete(ctx context.Context, id string) error
+	GetStatistics(ctx context.Context, appID string, startDate, endDate time.Time) (*TrackingStatistics, error)
 }
 
 // TrackingService はトラッキングのビジネスロジックを提供します
@@ -191,12 +203,12 @@ func (s *TrackingService) GetDailyStatistics(ctx context.Context, appID string, 
 
 // DailyStatistics は日別統計を表します
 type DailyStatistics struct {
-	AppID           string    `json:"app_id"`
-	Date            time.Time `json:"date"`
-	TotalSessions   int64     `json:"total_sessions"`
-	TotalPageViews  int64     `json:"total_page_views"`
-	UniqueVisitors  int64     `json:"unique_visitors"`
-	AverageSession  float64   `json:"average_session_duration"`
+	AppID          string    `json:"app_id"`
+	Date           time.Time `json:"date"`
+	TotalSessions  int64     `json:"total_sessions"`
+	TotalPageViews int64     `json:"total_page_views"`
+	UniqueVisitors int64     `json:"unique_visitors"`
+	AverageSession float64   `json:"average_session_duration"`
 }
 
 // calculateDailyStatistics は日別統計を計算します
@@ -212,8 +224,8 @@ func (s *TrackingService) calculateDailyStatistics(ctx context.Context, stats *D
 
 	stats.TotalPageViews = totalCount
 	stats.TotalSessions = totalCount / 10 // 簡易的な計算
-	stats.UniqueVisitors = totalCount / 5  // 簡易的な計算
-	stats.AverageSession = 300.0           // 5分（秒単位）
+	stats.UniqueVisitors = totalCount / 5 // 簡易的な計算
+	stats.AverageSession = 300.0          // 5分（秒単位）
 
 	return nil
 }

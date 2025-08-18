@@ -11,6 +11,7 @@ import (
 	"accesslog-tracker/internal/config"
 	"accesslog-tracker/internal/domain/services"
 	"accesslog-tracker/internal/infrastructure/database/postgresql"
+	postgresqlRepos "accesslog-tracker/internal/infrastructure/database/postgresql/repositories"
 	"accesslog-tracker/internal/infrastructure/cache/redis"
 	"accesslog-tracker/internal/utils/logger"
 )
@@ -23,8 +24,8 @@ var (
 
 func main() {
 	// 設定の読み込み
-	cfg, err := config.Load()
-	if err != nil {
+	cfg := config.New()
+	if err := cfg.LoadFromEnv(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
@@ -34,30 +35,32 @@ func main() {
 		"version":    Version,
 		"buildTime":  BuildTime,
 		"goVersion":  GoVersion,
-		"environment": cfg.Environment,
+		"environment": cfg.App.Name,
 	}).Info("Starting Access Log Tracker API Server")
 
 	// データベース接続の初期化
-	dbConn, err := postgresql.NewConnection(cfg.Database.Host, cfg.Database.Port, cfg.Database.Name, cfg.Database.User, cfg.Database.Password)
-	if err != nil {
+	dbConn := postgresql.NewConnection("main")
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Password, cfg.Database.Name, cfg.Database.SSLMode)
+	if err := dbConn.Connect(dsn); err != nil {
 		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 	defer dbConn.Close()
 
 	// Redis接続の初期化
-	redisConn := redis.NewCacheService(fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port))
+	redisConn := redis.NewCacheService(fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port))
 	if err := redisConn.Connect(); err != nil {
 		logger.WithError(err).Fatal("Failed to connect to Redis")
 	}
 	defer redisConn.Close()
 
 	// リポジトリの初期化
-	trackingRepo := postgresql.NewTrackingRepository(dbConn.GetDB())
-	applicationRepo := postgresql.NewApplicationRepository(dbConn.GetDB())
+	trackingRepo := postgresqlRepos.NewTrackingRepository(dbConn.GetDB())
+	applicationRepo := postgresqlRepos.NewApplicationRepository(dbConn.GetDB())
 
 	// サービスの初期化
-	trackingService := services.NewTrackingService(trackingRepo, redisConn)
-	applicationService := services.NewApplicationService(applicationRepo)
+	trackingService := services.NewTrackingService(trackingRepo)
+	applicationService := services.NewApplicationService(applicationRepo, redisConn)
 
 	// APIサーバーの初期化
 	apiServer := server.NewServer(

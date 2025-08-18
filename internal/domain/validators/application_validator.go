@@ -108,10 +108,7 @@ func (v *ApplicationValidator) validateAPIKey(apiKey string) error {
 
 // ValidateCreate はアプリケーション作成時のバリデーションを行います
 func (v *ApplicationValidator) ValidateCreate(app *models.Application) error {
-	// 基本バリデーション（APIキーは除外）
-	if app.AppID == "" {
-		return models.ErrApplicationAppIDRequired
-	}
+	// 基本バリデーション（AppIDとAPIキーは除外）
 	if app.Name == "" {
 		return models.ErrApplicationNameRequired
 	}
@@ -120,10 +117,6 @@ func (v *ApplicationValidator) ValidateCreate(app *models.Application) error {
 	}
 
 	// 詳細バリデーション
-	if err := v.ValidateAppID(app.AppID); err != nil {
-		return err
-	}
-
 	if err := v.validateName(app.Name); err != nil {
 		return err
 	}
@@ -132,7 +125,7 @@ func (v *ApplicationValidator) ValidateCreate(app *models.Application) error {
 		return err
 	}
 
-	// 作成時はAPIキーのバリデーションをスキップ（後で生成されるため）
+	// 作成時はAppIDとAPIキーのバリデーションをスキップ（後で生成されるため）
 	return nil
 }
 
@@ -142,7 +135,25 @@ func (v *ApplicationValidator) ValidateUpdate(app *models.Application) error {
 		return models.ErrApplicationAppIDRequired
 	}
 
-	return v.Validate(app)
+	// 基本バリデーション
+	if app.Name == "" {
+		return models.ErrApplicationNameRequired
+	}
+	if app.Domain == "" {
+		return models.ErrApplicationDomainRequired
+	}
+
+	// 詳細バリデーション
+	if err := v.validateName(app.Name); err != nil {
+		return err
+	}
+
+	if err := v.validateDomain(app.Domain); err != nil {
+		return err
+	}
+
+	// 更新時はAPIキーのバリデーションをスキップ（既存のキーを保持するため）
+	return nil
 }
 
 // ValidateAPIKey はAPIキーを検証します

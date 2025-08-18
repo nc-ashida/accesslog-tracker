@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"accesslog-tracker/internal/domain/models"
 	"accesslog-tracker/internal/domain/validators"
 	"accesslog-tracker/internal/utils/crypto"
+
+	"github.com/google/uuid"
 )
 
 // ApplicationRepository はアプリケーションリポジトリのインターフェースです
@@ -30,10 +31,23 @@ type CacheService interface {
 	Set(ctx context.Context, key string, value string, expiration time.Duration) error
 }
 
+// ApplicationServiceInterface はアプリケーションサービスのインターフェースです
+type ApplicationServiceInterface interface {
+	Create(ctx context.Context, app *models.Application) error
+	GetByID(ctx context.Context, id string) (*models.Application, error)
+	GetByAPIKey(ctx context.Context, apiKey string) (*models.Application, error)
+	Update(ctx context.Context, app *models.Application) error
+	Delete(ctx context.Context, id string) error
+	List(ctx context.Context, limit, offset int) ([]*models.Application, error)
+	Count(ctx context.Context) (int64, error)
+	RegenerateAPIKey(ctx context.Context, id string) (string, error)
+	UpdateSettings(ctx context.Context, id string, settings map[string]interface{}) error
+}
+
 // ApplicationService はアプリケーションのビジネスロジックを提供します
 type ApplicationService struct {
-	repo     ApplicationRepository
-	cache    CacheService
+	repo      ApplicationRepository
+	cache     CacheService
 	validator *validators.ApplicationValidator
 }
 

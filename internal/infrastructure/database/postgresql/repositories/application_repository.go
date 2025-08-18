@@ -150,7 +150,7 @@ func (r *ApplicationRepository) Update(ctx context.Context, app *models.Applicat
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("application not found: %s", app.AppID)
+		return models.ErrApplicationNotFound
 	}
 
 	return nil
@@ -171,7 +171,7 @@ func (r *ApplicationRepository) Delete(ctx context.Context, appID string) error 
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("application not found: %s", appID)
+		return models.ErrApplicationNotFound
 	}
 
 	return nil
@@ -228,7 +228,7 @@ func (r *ApplicationRepository) RegenerateAPIKey(ctx context.Context, id string)
 	}
 	
 	if rowsAffected == 0 {
-		return "", fmt.Errorf("application not found: %s", id)
+		return "", models.ErrApplicationNotFound
 	}
 	
 	return newAPIKey, nil

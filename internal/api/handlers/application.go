@@ -1,34 +1,36 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"accesslog-tracker/internal/api/models"
 	domainmodels "accesslog-tracker/internal/domain/models"
 	"accesslog-tracker/internal/domain/services"
 	"accesslog-tracker/internal/utils/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ApplicationHandler はアプリケーションAPIのハンドラーです
 type ApplicationHandler struct {
-	applicationService *services.ApplicationService
-	logger            logger.Logger
+	applicationService services.ApplicationServiceInterface
+	logger             logger.Logger
 }
 
 // NewApplicationHandler は新しいアプリケーションハンドラーを作成します
-func NewApplicationHandler(applicationService *services.ApplicationService, logger logger.Logger) *ApplicationHandler {
+func NewApplicationHandler(applicationService services.ApplicationServiceInterface, logger logger.Logger) *ApplicationHandler {
 	return &ApplicationHandler{
 		applicationService: applicationService,
-		logger:            logger,
+		logger:             logger,
 	}
 }
 
 // Create は新しいアプリケーションを作成します
 func (h *ApplicationHandler) Create(c *gin.Context) {
 	var req models.ApplicationRequest
-	
+
 	// リクエストボディをバインディング
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Warn("Invalid application request", "error", err.Error())
@@ -64,13 +66,13 @@ func (h *ApplicationHandler) Create(c *gin.Context) {
 
 	// レスポンスを作成
 	response := models.ApplicationResponse{
-		AppID:      app.AppID,
-		Name:       app.Name,
+		AppID:       app.AppID,
+		Name:        app.Name,
 		Description: app.Description,
-		Domain:     app.Domain,
-		APIKey:     app.APIKey,
-		CreatedAt:  app.CreatedAt,
-		UpdatedAt:  app.UpdatedAt,
+		Domain:      app.Domain,
+		APIKey:      app.APIKey,
+		CreatedAt:   app.CreatedAt,
+		UpdatedAt:   app.UpdatedAt,
 	}
 
 	h.logger.Info("Application created successfully", "app_id", app.AppID, "name", app.Name)
@@ -111,13 +113,13 @@ func (h *ApplicationHandler) Get(c *gin.Context) {
 
 	// レスポンスを作成
 	response := models.ApplicationResponse{
-		AppID:      app.AppID,
-		Name:       app.Name,
+		AppID:       app.AppID,
+		Name:        app.Name,
 		Description: app.Description,
-		Domain:     app.Domain,
-		APIKey:     app.APIKey,
-		CreatedAt:  app.CreatedAt,
-		UpdatedAt:  app.UpdatedAt,
+		Domain:      app.Domain,
+		APIKey:      app.APIKey,
+		CreatedAt:   app.CreatedAt,
+		UpdatedAt:   app.UpdatedAt,
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{
@@ -141,7 +143,7 @@ func (h *ApplicationHandler) Update(c *gin.Context) {
 	}
 
 	var req models.ApplicationUpdateRequest
-	
+
 	// リクエストボディをバインディング
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Warn("Invalid application update request", "error", err.Error())
@@ -156,15 +158,36 @@ func (h *ApplicationHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// アプリケーションを更新
+	// 既存のアプリケーションを取得
+	existingApp, err := h.applicationService.GetByID(c.Request.Context(), appID)
+	if err != nil {
+		h.logger.Error("Failed to get existing application", "error", err.Error(), "app_id", appID)
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error: &models.APIError{
+				Code:    "NOT_FOUND",
+				Message: "Application not found",
+			},
+		})
+		return
+	}
+
+	// アプリケーションを更新（既存のAPIキーを保持）
 	app := &domainmodels.Application{
 		AppID:       appID,
 		Name:        req.Name,
 		Description: req.Description,
 		Domain:      req.Domain,
-		Active:      *req.Active,
+		APIKey:      existingApp.APIKey, // 既存のAPIキーを保持
+		Active:      existingApp.Active, // 既存のActive状態を保持
+		CreatedAt:   existingApp.CreatedAt,
 	}
-	err := h.applicationService.Update(c.Request.Context(), app)
+
+	// Activeフィールドが指定されている場合のみ更新
+	if req.Active != nil {
+		app.Active = *req.Active
+	}
+	err = h.applicationService.Update(c.Request.Context(), app)
 	if err != nil {
 		h.logger.Error("Failed to update application", "error", err.Error(), "app_id", appID)
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
@@ -179,13 +202,13 @@ func (h *ApplicationHandler) Update(c *gin.Context) {
 
 	// レスポンスを作成
 	response := models.ApplicationResponse{
-		AppID:      app.AppID,
-		Name:       app.Name,
+		AppID:       app.AppID,
+		Name:        app.Name,
 		Description: app.Description,
-		Domain:     app.Domain,
-		APIKey:     app.APIKey,
-		CreatedAt:  app.CreatedAt,
-		UpdatedAt:  app.UpdatedAt,
+		Domain:      app.Domain,
+		APIKey:      app.APIKey,
+		CreatedAt:   app.CreatedAt,
+		UpdatedAt:   app.UpdatedAt,
 	}
 
 	h.logger.Info("Application updated successfully", "app_id", appID)
@@ -227,7 +250,7 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	total, err := h.applicationService.Count(c.Request.Context())
 	if err != nil {
 		h.logger.Error("Failed to list applications", "error", err.Error())
@@ -245,13 +268,13 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 	responses := make([]models.ApplicationResponse, len(apps))
 	for i, app := range apps {
 		responses[i] = models.ApplicationResponse{
-			AppID:      app.AppID,
-			Name:       app.Name,
+			AppID:       app.AppID,
+			Name:        app.Name,
 			Description: app.Description,
-			Domain:     app.Domain,
-			APIKey:     app.APIKey,
-			CreatedAt:  app.CreatedAt,
-			UpdatedAt:  app.UpdatedAt,
+			Domain:      app.Domain,
+			APIKey:      app.APIKey,
+			CreatedAt:   app.CreatedAt,
+			UpdatedAt:   app.UpdatedAt,
 		}
 	}
 
@@ -260,9 +283,9 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 		Data: gin.H{
 			"applications": responses,
 			"pagination": gin.H{
-				"page":       page,
-				"page_size":  pageSize,
-				"total":      total,
+				"page":        page,
+				"page_size":   pageSize,
+				"total":       total,
 				"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
 			},
 		},
@@ -287,6 +310,19 @@ func (h *ApplicationHandler) Delete(c *gin.Context) {
 	err := h.applicationService.Delete(c.Request.Context(), appID)
 	if err != nil {
 		h.logger.Error("Failed to delete application", "error", err.Error(), "app_id", appID)
+
+		// アプリケーションが見つからない場合
+		if errors.Is(err, domainmodels.ErrApplicationNotFound) {
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Success: false,
+				Error: &models.APIError{
+					Code:    "NOT_FOUND",
+					Message: "Application not found",
+				},
+			})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error: &models.APIError{

@@ -12,12 +12,12 @@ import (
 
 // AuthMiddleware は認証ミドルウェアの構造体です
 type AuthMiddleware struct {
-	applicationService *services.ApplicationService
+	applicationService services.ApplicationServiceInterface
 	logger             logger.Logger
 }
 
 // NewAuthMiddleware は新しい認証ミドルウェアを作成します
-func NewAuthMiddleware(applicationService *services.ApplicationService, logger logger.Logger) *AuthMiddleware {
+func NewAuthMiddleware(applicationService services.ApplicationServiceInterface, logger logger.Logger) *AuthMiddleware {
 	return &AuthMiddleware{
 		applicationService: applicationService,
 		logger:             logger,

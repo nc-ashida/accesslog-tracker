@@ -60,7 +60,23 @@ func Setup(
 			applications.PUT("/:id", applicationHandler.Update)
 			applications.DELETE("/:id", applicationHandler.Delete)
 		}
+
+		// ビーコン関連エンドポイント（認証不要）
+		beaconHandler := handlers.NewBeaconHandler()
+		beacon := v1.Group("/beacon")
+		beacon.Use(rateLimitMiddleware.RateLimit())
+		{
+			beacon.GET("/generate", beaconHandler.GenerateBeacon)
+			beacon.POST("/generate", beaconHandler.GenerateBeaconWithConfig)
+			beacon.GET("/health", beaconHandler.Health)
+		}
 	}
+
+	// ビーコン配信ルート（APIバージョンなし、認証不要）
+	beaconHandler := handlers.NewBeaconHandler()
+	router.GET("/tracker.js", beaconHandler.Serve)
+	router.GET("/tracker.min.js", beaconHandler.ServeMinified)
+	router.GET("/tracker/:app_id.js", beaconHandler.ServeCustom)
 
 	// 404ハンドラー
 	router.NoRoute(middleware.NotFoundHandler())
@@ -115,7 +131,23 @@ func SetupTest(
 			applications.PUT("/:id", applicationHandler.Update)
 			applications.DELETE("/:id", applicationHandler.Delete)
 		}
+
+		// ビーコン関連エンドポイント（テスト用）
+		beaconHandler := handlers.NewBeaconHandler()
+		beacon := v1.Group("/beacon")
+		beacon.Use(rateLimitMiddleware.RateLimit())
+		{
+			beacon.GET("/generate", beaconHandler.GenerateBeacon)
+			beacon.POST("/generate", beaconHandler.GenerateBeaconWithConfig)
+			beacon.GET("/health", beaconHandler.Health)
+		}
 	}
+
+	// ビーコン配信ルート（テスト用）
+	beaconHandler := handlers.NewBeaconHandler()
+	router.GET("/tracker.js", beaconHandler.Serve)
+	router.GET("/tracker.min.js", beaconHandler.ServeMinified)
+	router.GET("/tracker/:app_id.js", beaconHandler.ServeCustom)
 
 	// 404ハンドラー
 	router.NoRoute(middleware.NotFoundHandler())

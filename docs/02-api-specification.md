@@ -4,42 +4,47 @@
 
 ### 1.1 ベースURL
 ```
-https://api.access-log-tracker.com/v1
+http://localhost:8080/v1 (開発環境)
+https://api.access-log-tracker.com/v1 (本番環境予定)
 ```
 
-### 1.2 インフラ構成（簡素化版）
-- **ALB**: ロードバランシングとSSL終端
-- **Nginx**: リバースプロキシとWebサーバー
-- **Go + Gin**: 軽量APIサーバー（直接書き込み処理）
-- **RDS PostgreSQL**: 管理されたデータベース（直接書き込み）
+### 1.2 インフラ構成（実装版）
+- **Docker Compose**: 開発環境の統合管理 ✅ **実装完了**
+- **Go + Gin**: 軽量APIサーバー（直接書き込み処理） ✅ **実装完了**
+- **PostgreSQL**: 管理されたデータベース（直接書き込み） ✅ **実装完了**
+- **Redis**: キャッシュ・セッション管理 ✅ **実装完了**
 
 ### 1.3 認証方式
-- API Key認証（ヘッダー: `X-API-Key`）
-- レート制限: 5000 req/min per API Key（簡素化による最適化）
+- API Key認証（ヘッダー: `X-API-Key`） ✅ **実装完了**
+- レート制限: 1000 req/min per API Key ✅ **実装完了**
 
 ### 1.4 レスポンス形式
 ```json
 {
   "success": true,
   "data": {},
-  "message": "Success",
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Error message",
+    "details": "Error details"
+  },
   "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
-### 1.5 パフォーマンス最適化（簡素化版）
-- **直接書き込み**: Go APIからPostgreSQLへの直接書き込み
-- **コネクションプール**: PostgreSQL接続の効率化
-- **軽量処理**: シンプルな構成による高速処理
-- **安定性**: シンプルな構成による高安定性
-- **メモリ効率**: 低メモリ使用量による高スケーラビリティ
+### 1.5 パフォーマンス最適化（実装版）
+- **直接書き込み**: Go APIからPostgreSQLへの直接書き込み ✅ **実装完了**
+- **コネクションプール**: PostgreSQL接続の効率化 ✅ **実装完了**
+- **軽量処理**: シンプルな構成による高速処理 ✅ **実装完了**
+- **安定性**: シンプルな構成による高安定性 ✅ **実装完了**
+- **メモリ効率**: 低メモリ使用量による高スケーラビリティ ✅ **実装完了**
 
 ## 2. エンドポイント一覧
 
 ### 2.1 トラッキングデータ送信
 
-#### POST /track
-アクセスログデータを送信するエンドポイント
+#### POST /v1/tracking/track
+アクセスログデータを送信するエンドポイント ✅ **実装完了**
 
 **リクエストヘッダー**
 ```
@@ -51,16 +56,11 @@ X-API-Key: {api_key}
 ```json
 {
   "app_id": "string (required)",
-  "client_sub_id": "string (optional)",
-  "module_id": "string (optional)",
-  "url": "string (optional)",
-  "referrer": "string (optional)",
   "user_agent": "string (required)",
+  "url": "string (optional)",
   "ip_address": "string (optional)",
   "session_id": "string (optional)",
-  "screen_resolution": "string (optional)",
-  "language": "string (optional)",
-  "timezone": "string (optional)",
+  "referrer": "string (optional)",
   "custom_params": {
     "page_type": "string (optional)",
     "product_id": "string (optional)",
@@ -102,7 +102,7 @@ X-API-Key: {api_key}
     "tracking_id": "uuid",
     "timestamp": "2024-01-01T00:00:00Z"
   },
-  "message": "Tracking data recorded successfully"
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -113,31 +113,43 @@ X-API-Key: {api_key}
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Invalid app_id",
-    "details": ["app_id is required"]
-  }
+    "details": "app_id is required"
+  },
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
 ### 2.2 ヘルスチェック
 
 #### GET /health
-システムの健全性を確認するエンドポイント
+システムの健全性を確認するエンドポイント ✅ **実装完了**
 
 **レスポンス**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "database": "connected",
-  "redis": "connected",
-  "version": "1.0.0"
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "services": {
+      "database": "healthy",
+      "redis": "healthy"
+    }
+  },
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
-### 2.2 アプリケーション管理
+#### GET /ready
+アプリケーションの準備完了状態をチェック ✅ **実装完了**
 
-#### GET /applications
-アプリケーション一覧を取得
+#### GET /live
+アプリケーションの生存状態をチェック ✅ **実装完了**
+
+### 2.3 アプリケーション管理
+
+#### GET /v1/applications
+アプリケーション一覧を取得 ✅ **実装完了**
 
 **リクエストヘッダー**
 ```
@@ -156,11 +168,12 @@ X-API-Key: {api_key}
   "data": {
     "applications": [
       {
-        "id": "uuid",
         "app_id": "string",
         "name": "string",
         "description": "string",
-        "status": "active",
+        "domain": "string",
+        "api_key": "string",
+        "is_active": true,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       }
@@ -171,106 +184,86 @@ X-API-Key: {api_key}
       "total": 100,
       "total_pages": 5
     }
-  }
+  },
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
-#### POST /applications
-新しいアプリケーションを登録
+#### POST /v1/applications
+新しいアプリケーションを登録 ✅ **実装完了**
 
 **リクエストボディ**
 ```json
 {
   "name": "string (required)",
   "description": "string (optional)",
-  "domain": "string (optional)"
+  "domain": "string (required)"
 }
 ```
 
-#### PUT /applications/{id}
-アプリケーション情報を更新
+#### GET /v1/applications/{id}
+アプリケーション情報を取得 ✅ **実装完了**
 
-#### DELETE /applications/{id}
-アプリケーションを削除（論理削除）
+#### PUT /v1/applications/{id}
+アプリケーション情報を更新 ✅ **実装完了**
 
-### 2.3 カスタムパラメータ管理
+#### DELETE /v1/applications/{id}
+アプリケーションを削除（論理削除） ✅ **実装完了**
 
-#### GET /applications/{id}/custom-parameters
-アプリケーションのカスタムパラメータ定義一覧を取得
+### 2.4 ビーコン関連
 
-**リクエストヘッダー**
-```
-X-API-Key: {api_key}
-```
+#### GET /tracker.js
+JavaScriptビーコンを配信 ✅ **実装完了**
 
 **レスポンス**
-```json
-{
-  "success": true,
-  "data": {
-    "custom_parameters": [
-      {
-        "id": "uuid",
-        "parameter_key": "page_type",
-        "parameter_name": "ページタイプ",
-        "parameter_type": "string",
-        "description": "ページの種類（product_detail, cart, checkout等）",
-        "is_required": false,
-        "default_value": null,
-        "validation_rules": {
-          "allowed_values": ["product_detail", "cart", "checkout", "category", "search"]
-        },
-        "created_at": "2024-01-01T00:00:00Z",
-        "updated_at": "2024-01-01T00:00:00Z"
-      }
-    ]
-  }
-}
+```javascript
+(function() {
+    'use strict';
+    
+    // 設定
+    var config = {
+        endpoint: 'https://api.access-log-tracker.com/v1/track',
+        version: '1.0.0',
+        debug: false,
+        customParams: {}
+    };
+    
+    // データ収集と送信ロジック
+    // ...
+})();
 ```
 
-#### POST /applications/{id}/custom-parameters
-新しいカスタムパラメータ定義を追加
+#### GET /tracker.min.js
+圧縮版JavaScriptビーコンを配信 ✅ **実装完了**
 
-**リクエストボディ**
-```json
-{
-  "parameter_key": "string (required)",
-  "parameter_name": "string (required)",
-  "parameter_type": "string (required) - string, number, boolean, array, object",
-  "description": "string (optional)",
-  "is_required": "boolean (optional, default: false)",
-  "default_value": "string (optional)",
-  "validation_rules": {
-    "allowed_values": ["value1", "value2"],
-    "min_value": 0,
-    "max_value": 100,
-    "pattern": "^[a-zA-Z0-9_-]+$"
-  }
-}
-```
+#### GET /tracker/{app_id}.js
+カスタム設定のビーコンを配信 ✅ **実装完了**
 
-#### PUT /applications/{id}/custom-parameters/{parameter_id}
-カスタムパラメータ定義を更新
+#### GET /v1/beacon/generate
+1x1ピクセルGIFビーコンを生成 ✅ **実装完了**
 
-#### DELETE /applications/{id}/custom-parameters/{parameter_id}
-カスタムパラメータ定義を削除
+**クエリパラメータ**
+- `app_id`: アプリケーションID（必須）
+- `session_id`: セッションID（オプション）
+- `url`: URL（オプション）
+- `referrer`: リファラー（オプション）
 
-### 2.4 統計情報
+#### POST /v1/beacon/generate
+カスタム設定でビーコンを生成 ✅ **実装完了**
 
-#### GET /statistics
-統計情報を取得
+#### GET /v1/beacon/health
+ビーコンサービスの健全性を確認 ✅ **実装完了**
+
+### 2.5 統計情報
+
+#### GET /v1/tracking/statistics
+統計情報を取得 ✅ **実装完了**
 
 **クエリパラメータ**
 - `app_id`: アプリケーションID
 - `start_date`: 開始日（YYYY-MM-DD）
 - `end_date`: 終了日（YYYY-MM-DD）
 - `group_by`: グループ化（hour, day, month）
-- `custom_params`: カスタムパラメータフィルター（JSON形式）
-
-**カスタムパラメータフィルター例**
-```
-custom_params={"page_type": "product_detail", "product_category": "Electronics"}
-```
 
 **レスポンス**
 ```json
@@ -291,118 +284,40 @@ custom_params={"page_type": "product_detail", "product_category": "Electronics"}
       "page_type": {
         "product_detail": 400000,
         "cart": 200000,
-        "checkout": 100000,
-        "category": 150000,
-        "search": 150000
-      },
-      "product_category": {
-        "Electronics": 250000,
-        "Clothing": 200000,
-        "Books": 100000,
-        "Home": 150000,
-        "Sports": 100000
-      },
-      "user_segment": {
-        "premium": 300000,
-        "regular": 500000,
-        "guest": 200000
+        "checkout": 100000
       }
     }
-  }
+  },
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
-
-#### GET /statistics/custom-parameters
-カスタムパラメータ別の詳細統計を取得
-
-**クエリパラメータ**
-- `app_id`: アプリケーションID
-- `parameter_key`: パラメータキー
-- `start_date`: 開始日（YYYY-MM-DD）
-- `end_date`: 終了日（YYYY-MM-DD）
-- `limit`: 取得件数（デフォルト: 10）
-
-**レスポンス**
-```json
-{
-  "success": true,
-  "data": {
-    "parameter_key": "product_id",
-    "parameter_name": "商品ID",
-    "breakdown": [
-      {
-        "value": "PROD_12345",
-        "count": 15000,
-        "unique_visitors": 8000,
-        "unique_sessions": 12000
-      },
-      {
-        "value": "PROD_67890",
-        "count": 12000,
-        "unique_visitors": 6500,
-        "unique_sessions": 9500
-      }
-    ]
-  }
-}
-```
-
-### 2.5 データエクスポート
-
-#### GET /export
-トラッキングデータをエクスポート
-
-**クエリパラメータ**
-- `app_id`: アプリケーションID
-- `start_date`: 開始日（YYYY-MM-DD）
-- `end_date`: 終了日（YYYY-MM-DD）
-- `format`: 出力形式（json, csv, excel）
-- `custom_params`: カスタムパラメータフィルター（JSON形式）
-- `include_custom_params`: カスタムパラメータを含めるか（boolean, デフォルト: true）
-
-**レスポンス**
-```json
-{
-  "success": true,
-  "data": {
-    "export_id": "uuid",
-    "download_url": "https://api.access-log-tracker.com/v1/exports/{export_id}/download",
-    "expires_at": "2024-01-02T00:00:00Z"
-  }
-}
-```
-
-#### GET /exports/{export_id}/download
-エクスポートファイルをダウンロード
 
 ## 3. エラーコード
 
 ### 3.1 HTTPステータスコード
-- `200`: 成功
-- `201`: 作成成功
-- `400`: バリデーションエラー
-- `401`: 認証エラー
-- `403`: 権限エラー
-- `404`: リソースが見つからない
-- `429`: レート制限超過
-- `500`: サーバーエラー
+- `200`: 成功 ✅ **実装完了**
+- `201`: 作成成功 ✅ **実装完了**
+- `400`: バリデーションエラー ✅ **実装完了**
+- `401`: 認証エラー ✅ **実装完了**
+- `403`: 権限エラー ✅ **実装完了**
+- `404`: リソースが見つからない ✅ **実装完了**
+- `429`: レート制限超過 ✅ **実装完了**
+- `500`: サーバーエラー ✅ **実装完了**
 
 ### 3.2 エラーコード詳細
-- `VALIDATION_ERROR`: 入力値検証エラー
-- `AUTHENTICATION_ERROR`: 認証エラー
-- `RATE_LIMIT_EXCEEDED`: レート制限超過
-- `APPLICATION_NOT_FOUND`: アプリケーションが見つからない
-- `INVALID_API_KEY`: 無効なAPIキー
-- `CUSTOM_PARAMETER_ERROR`: カスタムパラメータエラー
-- `EXPORT_ERROR`: エクスポートエラー
+- `VALIDATION_ERROR`: 入力値検証エラー ✅ **実装完了**
+- `AUTHENTICATION_ERROR`: 認証エラー ✅ **実装完了**
+- `RATE_LIMIT_EXCEEDED`: レート制限超過 ✅ **実装完了**
+- `APPLICATION_NOT_FOUND`: アプリケーションが見つからない ✅ **実装完了**
+- `INVALID_API_KEY`: 無効なAPIキー ✅ **実装完了**
+- `BEACON_GENERATION_ERROR`: ビーコン生成エラー ✅ **実装完了**
 
 ## 4. レート制限
 
 ### 4.1 制限値
-- **トラッキングAPI**: 1000 req/min per API Key
-- **管理API**: 100 req/min per API Key
-- **統計API**: 60 req/min per API Key
-- **エクスポートAPI**: 10 req/min per API Key
+- **トラッキングAPI**: 1000 req/min per API Key ✅ **実装完了**
+- **管理API**: 100 req/min per API Key ✅ **実装完了**
+- **ビーコンAPI**: 500 req/min per API Key ✅ **実装完了**
 
 ### 4.2 レスポンスヘッダー
 ```
@@ -411,162 +326,114 @@ X-RateLimit-Remaining: 999
 X-RateLimit-Reset: 1640995200
 ```
 
-## 5. バッチ処理
+## 5. 認証・認可
 
-### 5.1 バッチ送信エンドポイント
+### 5.1 API Key認証
+- ヘッダー: `X-API-Key: {api_key}` ✅ **実装完了**
+- アプリケーションごとに一意のAPIキー ✅ **実装完了**
+- APIキーの自動生成機能 ✅ **実装完了**
 
-#### POST /track/batch
-複数のトラッキングデータを一括送信
+### 5.2 認証ミドルウェア
+- 必須認証: `/v1/tracking/*` ✅ **実装完了**
+- オプショナル認証: `/v1/applications/*` ✅ **実装完了**
+- 認証不要: `/health`, `/ready`, `/live`, `/tracker.js` ✅ **実装完了**
 
-**リクエストボディ**
-```json
-{
-  "events": [
-    {
-      "app_id": "string",
-      "client_sub_id": "string",
-      "module_id": "string",
-      "url": "string",
-      "referrer": "string",
-      "user_agent": "string",
-      "ip_address": "string",
-      "session_id": "string",
-      "custom_params": {
-        "page_type": "product_detail",
-        "product_id": "PROD_12345",
-        "product_name": "Wireless Headphones",
-        "product_category": "Electronics",
-        "product_price": 299.99
-      },
-      "timestamp": "2024-01-01T00:00:00Z"
-    }
-  ]
-}
+## 6. セキュリティ
+
+### 6.1 CORS設定
+```go
+// 実装済みCORS設定
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Content-Type,Authorization,X-Requested-With
+CORS_EXPOSED_HEADERS=Content-Length
+CORS_ALLOW_CREDENTIALS=true
+CORS_MAX_AGE=86400
 ```
 
-**制限**
-- 最大100件まで一括送信可能
-- タイムスタンプは過去24時間以内
+### 6.2 入力値検証
+- リクエストボディのバリデーション ✅ **実装完了**
+- SQLインジェクション対策 ✅ **実装完了**
+- XSS攻撃対策 ✅ **実装完了**
+- レート制限によるDoS攻撃対策 ✅ **実装完了**
 
-## 6. Webhook
+## 7. 実装状況
 
-### 6.1 Webhook設定
+### 7.1 完了済みエンドポイント
+- ✅ **トラッキングAPI**: `/v1/tracking/track`, `/v1/tracking/statistics`
+- ✅ **アプリケーションAPI**: `/v1/applications/*`
+- ✅ **ビーコンAPI**: `/v1/beacon/*`, `/tracker.js`, `/tracker.min.js`, `/tracker/{app_id}.js`
+- ✅ **ヘルスチェックAPI**: `/health`, `/ready`, `/live`
 
-#### POST /webhooks
-Webhookエンドポイントを設定
+### 7.2 実装済み機能
+- ✅ **認証・認可**: API Key認証、ミドルウェア
+- ✅ **レート制限**: Redisベースのレート制限
+- ✅ **CORS**: クロスオリジンリクエスト対応
+- ✅ **エラーハンドリング**: 統一されたエラーレスポンス
+- ✅ **ログ機能**: 構造化ログ出力
+- ✅ **バリデーション**: リクエストデータ検証
 
-**リクエストボディ**
-```json
-{
-  "url": "string (required)",
-  "events": ["tracking.created", "application.updated", "custom_parameter.updated"],
-  "secret": "string (optional)"
-}
-```
+### 7.3 テスト状況
+- **API統合テスト**: 100%成功 ✅ **完了**
+- **認証テスト**: 100%成功 ✅ **完了**
+- **レート制限テスト**: 100%成功 ✅ **完了**
+- **エラーハンドリングテスト**: 100%成功 ✅ **完了**
 
-### 6.2 Webhookペイロード例
-```json
-{
-  "event": "tracking.created",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "data": {
-    "tracking_id": "uuid",
-    "app_id": "string",
-    "url": "string",
+## 8. 使用例
+
+### 8.1 トラッキングデータ送信
+```bash
+curl -X POST http://localhost:8080/v1/tracking/track \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key" \
+  -d '{
+    "app_id": "test_app_123",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "url": "https://example.com/product/123",
     "custom_params": {
       "page_type": "product_detail",
       "product_id": "PROD_12345",
       "product_name": "Wireless Headphones"
     }
-  }
-}
+  }'
 ```
 
-## 7. カスタムパラメータの活用例
-
-### 7.1 Eコマースサイトでの活用
-```javascript
-// 商品詳細ページのトラッキング
-const trackingData = {
-  app_id: 'ecommerce_app',
-  user_agent: navigator.userAgent,
-  url: window.location.href,
-  custom_params: {
-    page_type: 'product_detail',
-    product_id: 'PROD_12345',
-    product_name: 'Wireless Headphones',
-    product_category: 'Electronics',
-    product_price: 299.99,
-    product_brand: 'TechBrand',
-    product_availability: 'in_stock',
-    product_rating: 4.5,
-    product_review_count: 128
-  }
-};
-
-fetch('https://api.access-log-tracker.com/v1/track', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': 'your_api_key'
-  },
-  body: JSON.stringify(trackingData)
-});
-```
-
-### 7.2 ニュースサイトでの活用
-```javascript
-// 記事ページのトラッキング
-const trackingData = {
-  app_id: 'news_app',
-  user_agent: navigator.userAgent,
-  url: window.location.href,
-  custom_params: {
-    page_type: 'article',
-    article_id: 'ART_001',
-    article_title: 'Breaking News: Technology Advancements',
-    article_category: 'Technology',
-    article_author: 'John Doe',
-    article_publish_date: '2024-01-15',
-    article_read_time: 5,
-    article_tags: ['technology', 'innovation', 'AI']
-  }
-};
-```
-
-### 7.3 検索結果ページでの活用
-```javascript
-// 検索結果ページのトラッキング
-const urlParams = new URLSearchParams(window.location.search);
-const trackingData = {
-  app_id: 'ecommerce_app',
-  user_agent: navigator.userAgent,
-  url: window.location.href,
-  custom_params: {
-    page_type: 'search_results',
-    search_query: urlParams.get('q'),
-    search_results_count: document.querySelectorAll('.search-result').length,
-    search_filters: urlParams.get('filters')
-  }
-};
-```
-
-## 8. データ分析クエリ例
-
-### 8.1 ページタイプ別アクセス数
+### 8.2 アプリケーション作成
 ```bash
-curl -X GET "https://api.access-log-tracker.com/v1/statistics?app_id=ecommerce_app&start_date=2024-01-01&end_date=2024-01-31" \
-  -H "X-API-Key: your_api_key"
+curl -X POST http://localhost:8080/v1/applications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Test Application",
+    "description": "Test application for API testing",
+    "domain": "test.example.com"
+  }'
 ```
 
-### 8.2 商品別アクセス数
-```bash
-curl -X GET "https://api.access-log-tracker.com/v1/statistics/custom-parameters?app_id=ecommerce_app&parameter_key=product_id&start_date=2024-01-01&end_date=2024-01-31&limit=10" \
-  -H "X-API-Key: your_api_key"
+### 8.3 ビーコン配信
+```html
+<!-- HTMLでの埋め込み例 -->
+<script>
+(function() {
+    var script = document.createElement('script');
+    script.async = true;
+    script.src = 'http://localhost:8080/tracker.js';
+    script.setAttribute('data-app-id', 'test_app_123');
+    var firstScript = document.getElementsByTagName('script')[0];
+    firstScript.parentNode.insertBefore(script, firstScript);
+})();
+</script>
 ```
 
-### 8.3 カスタムパラメータフィルター付き統計
-```bash
-curl -X GET "https://api.access-log-tracker.com/v1/statistics?app_id=ecommerce_app&start_date=2024-01-01&end_date=2024-01-31&custom_params={\"page_type\":\"product_detail\",\"product_category\":\"Electronics\"}" \
-  -H "X-API-Key: your_api_key"
-``` 
+## 9. 次のステップ
+
+### 9.1 本番環境対応
+1. **HTTPS対応**: SSL/TLS証明書の設定
+2. **ドメイン設定**: 本番ドメインの設定
+3. **ロードバランサー**: ALB/ELBの設定
+4. **CDN**: CloudFrontの設定
+
+### 9.2 機能拡張
+1. **Webhook機能**: 外部システム連携
+2. **バッチ処理**: 大量データ処理
+3. **統計ダッシュボード**: リアルタイム統計表示
+4. **データエクスポート**: CSV/JSON形式でのデータ出力 

@@ -175,6 +175,49 @@ test-coverage: ## テストカバレッジを実行
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "カバレッジレポート: coverage.html"
 
+# フェーズ4 APIテスト カバレッジ100%達成用
+.PHONY: test-phase4
+test-phase4: ## フェーズ4 APIテストを実行（カバレッジ100%目標）
+	@echo "フェーズ4 APIテストを実行中（カバレッジ100%目標）..."
+	./tests/integration/run_tests_with_coverage.sh
+
+.PHONY: test-phase4-container
+test-phase4-container: ## コンテナ内でフェーズ4 APIテストを実行
+	@echo "コンテナ内でフェーズ4 APIテストを実行中..."
+	docker-compose -f docker-compose.test.yml up -d postgres redis
+	sleep 10
+	docker-compose -f docker-compose.test.yml exec -T postgres psql -U postgres -d access_log_tracker_test -f /docker-entrypoint-initdb.d/01_init_test_db.sql
+	docker-compose -f docker-compose.test.yml run --rm \
+		-e TEST_DB_HOST=postgres \
+		-e TEST_REDIS_HOST=redis \
+		-e CGO_ENABLED=0 \
+		test-runner \
+		go test -v -coverprofile=coverage.out -covermode=atomic \
+		-coverpkg=./internal/api/...,./internal/domain/...,./internal/infrastructure/... \
+		./tests/integration/...
+	docker-compose -f docker-compose.test.yml run --rm test-runner \
+		go tool cover -html=coverage.out -o coverage.html
+	docker-compose -f docker-compose.test.yml run --rm test-runner \
+		go tool cover -func=coverage.out
+	docker-compose -f docker-compose.test.yml down
+
+.PHONY: test-phase4-coverage-report
+test-phase4-coverage-report: ## フェーズ4 APIテストのカバレッジレポートを生成
+	@echo "フェーズ4 APIテストのカバレッジレポートを生成中..."
+	@if [ -f "coverage.out" ]; then \
+		go tool cover -html=coverage.out -o coverage.html; \
+		echo "カバレッジレポート: coverage.html"; \
+		go tool cover -func=coverage.out; \
+	else \
+		echo "カバレッジファイルが見つかりません。先にテストを実行してください: make test-phase4"; \
+	fi
+
+.PHONY: test-phase4-clean
+test-phase4-clean: ## フェーズ4 APIテストのクリーンアップ
+	@echo "フェーズ4 APIテストのクリーンアップ中..."
+	docker-compose -f docker-compose.test.yml down -v
+	rm -f coverage.out coverage.html
+
 .PHONY: test-benchmark
 test-benchmark: ## ベンチマークテストを実行
 	@echo "ベンチマークテストを実行中..."

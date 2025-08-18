@@ -14,12 +14,12 @@ import (
 
 // TrackingHandler はトラッキングAPIのハンドラーです
 type TrackingHandler struct {
-	trackingService *services.TrackingService
+	trackingService services.TrackingServiceInterface
 	logger          logger.Logger
 }
 
 // NewTrackingHandler は新しいトラッキングハンドラーを作成します
-func NewTrackingHandler(trackingService *services.TrackingService, logger logger.Logger) *TrackingHandler {
+func NewTrackingHandler(trackingService services.TrackingServiceInterface, logger logger.Logger) *TrackingHandler {
 	return &TrackingHandler{
 		trackingService: trackingService,
 		logger:          logger,

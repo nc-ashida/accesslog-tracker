@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -22,6 +23,33 @@ func randomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+// CreateTestApplication はテスト用アプリケーションを作成します
+func CreateTestApplication(t *testing.T, db *sql.DB) *models.Application {
+	// より一意なIDを生成
+	timestamp := time.Now().UnixNano()
+	randomSuffix := randomString(8)
+	
+	app := &models.Application{
+		AppID:       fmt.Sprintf("test_app_%d_%s", timestamp, randomSuffix),
+		Name:        "Test Application",
+		Description: "Test application for integration testing",
+		Domain:      "test.example.com",
+		APIKey:      fmt.Sprintf("alt_test_api_key_%d_%s", timestamp, randomSuffix),
+		Active:      true,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	
+	_, err := db.Exec(`
+		INSERT INTO applications (app_id, name, description, domain, api_key, active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (app_id) DO NOTHING
+	`, app.AppID, app.Name, app.Description, app.Domain, app.APIKey, app.Active, app.CreatedAt, app.UpdatedAt)
+	require.NoError(t, err)
+	
+	return app
 }
 
 func setupTestDatabase() (*repositories.TrackingRepository, *postgresql.Connection, func(), error) {
@@ -47,10 +75,10 @@ func setupTestDatabase() (*repositories.TrackingRepository, *postgresql.Connecti
 	// テスト用のアプリケーションを作成
 	appRepo := repositories.NewApplicationRepository(conn.GetDB())
 	testApp := &models.Application{
-		AppID:    "test_app_tracking_123",
+		AppID:    "test_app_tracking_" + time.Now().Format("20060102150405") + "_" + randomString(5),
 		Name:     "Test Tracking Application",
 		Domain:   "example.com",
-		APIKey:   "test-api-key-tracking-123",
+		APIKey:   "test-api-key-tracking_" + time.Now().Format("20060102150405") + "_" + randomString(5),
 		Active:   true,
 	}
 	err = appRepo.Create(context.Background(), testApp)
@@ -184,7 +212,7 @@ func TestTrackingRepository_Integration(t *testing.T) {
 		err = appRepo.Create(ctx, testApp)
 		require.NoError(t, err)
 		
-		sessionID := "alt_session_123"
+		sessionID := "alt_session_" + time.Now().Format("20060102150405") + "_" + randomString(5)
 		trackingData := &models.TrackingData{
 			AppID:     testApp.AppID,
 			UserAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)",
@@ -206,7 +234,7 @@ func TestTrackingRepository_Integration(t *testing.T) {
 	})
 
 	t.Run("should find tracking data by date range", func(t *testing.T) {
-		appID := "test_app_date_range"
+		appID := "test_app_date_range_" + time.Now().Format("20060102150405") + "_" + randomString(5)
 		now := time.Now()
 		
 		// 必要なアプリケーションを作成
@@ -215,7 +243,7 @@ func TestTrackingRepository_Integration(t *testing.T) {
 			AppID:    appID,
 			Name:     "Test Date Range App",
 			Domain:   "example.com",
-			APIKey:   "test-api-key-date-range",
+			APIKey:   "test-api-key-date-range_" + time.Now().Format("20060102150405") + "_" + randomString(5),
 			Active:   true,
 		}
 		err = appRepo.Create(ctx, testApp)

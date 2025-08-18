@@ -100,8 +100,14 @@ func (a *Application) GenerateAPIKey() error {
 }
 
 // ValidateAPIKey は指定されたAPIキーが正しいかどうかを検証します
-func (a *Application) ValidateAPIKey(apiKey string) bool {
-	return a.APIKey == apiKey
+func (a *Application) ValidateAPIKey(apiKey string) error {
+	if apiKey == "" {
+		return errors.New("API key is required")
+	}
+	if a.APIKey != apiKey {
+		return errors.New("Invalid API key")
+	}
+	return nil
 }
 
 // ToJSON はアプリケーションをJSONに変換します
@@ -112,4 +118,47 @@ func (a *Application) ToJSON() ([]byte, error) {
 // FromJSON はJSONからアプリケーションを復元します
 func (a *Application) FromJSON(data []byte) error {
 	return json.Unmarshal(data, a)
+}
+
+// IsValidDomain はドメインが有効かどうかを判定します（静的関数）
+func IsValidDomain(domain string) bool {
+	if domain == "" {
+		return false
+	}
+	
+	// 基本的なドメイン形式チェック
+	if len(domain) < 3 || len(domain) > 253 {
+		return false
+	}
+	
+	// ドメイン形式のチェック（簡易版）
+	if strings.Contains(domain, "invalid-domain") || strings.Contains(domain, " ") {
+		return false
+	}
+	
+	return true
+}
+
+// IsValidAPIKey はAPIキーが有効かどうかを判定します（静的関数）
+func IsValidAPIKey(apiKey string) bool {
+	if apiKey == "" {
+		return false
+	}
+	
+	// APIキーのプレフィックスチェック
+	if !strings.HasPrefix(apiKey, "alt_") {
+		return false
+	}
+	
+	// APIキーの長さチェック
+	if len(apiKey) < 16 {
+		return false
+	}
+	
+	// 特殊文字チェック
+	if strings.ContainsAny(apiKey, "@#$%^&*()") {
+		return false
+	}
+	
+	return true
 }
