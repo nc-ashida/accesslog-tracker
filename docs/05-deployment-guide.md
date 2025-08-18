@@ -531,7 +531,46 @@ services:
         max_attempts: 3
 ```
 
-### 5.2 本番環境用環境変数
+### 5.2 本番環境用サービス登録スクリプト
+
+#### 5.2.1 スクリプト配置場所
+```bash
+# プロジェクト構造
+deployments/
+├── scripts/
+│   ├── production/
+│   │   ├── register-service.sh    # サービス登録スクリプト
+│   │   ├── deploy.sh             # デプロイスクリプト
+│   │   ├── setup.sh              # 初期セットアップスクリプト
+│   │   └── health-check.sh       # ヘルスチェックスクリプト
+│   └── common/
+│       ├── utils.sh              # 共通ユーティリティ
+│       └── logging.sh            # ログ機能
+```
+
+#### 5.2.2 使用方法
+```bash
+# 1. 初期セットアップ（初回のみ）
+./deployments/scripts/production/setup.sh
+
+# 2. サービス登録
+./deployments/scripts/production/register-service.sh
+
+# 3. アプリケーションデプロイ
+./deployments/scripts/production/deploy.sh v1.0.0
+
+# 4. ヘルスチェック
+./deployments/scripts/production/health-check.sh
+```
+
+#### 5.2.3 スクリプトの権限設定
+```bash
+# スクリプトに実行権限を付与
+chmod +x deployments/scripts/production/*.sh
+chmod +x deployments/scripts/common/*.sh
+```
+
+### 5.3 本番環境用環境変数
 ```bash
 # 本番環境用の環境変数
 DB_HOST=access-log-tracker.cluster-xyz.us-east-1.rds.amazonaws.com

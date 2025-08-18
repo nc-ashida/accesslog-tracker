@@ -107,11 +107,20 @@ accesslog-tracker/
 │   │   └── beacon_tracking_test.go
 │   └── test_helpers.go           # テストヘルパー
 ├── deployments/                  # デプロイメント関連
-│   └── database/                 # データベース関連
-│       ├── init/                 # 初期化スクリプト
-│       │   └── 01_init_test_db.sql
-│       └── migrations/           # マイグレーション
-│           └── 001_initial_schema.sql
+│   ├── database/                 # データベース関連
+│   │   ├── init/                 # 初期化スクリプト
+│   │   │   └── 01_init_test_db.sql
+│   │   └── migrations/           # マイグレーション
+│   │       └── 001_initial_schema.sql
+│   └── scripts/                  # デプロイメントスクリプト
+│       ├── production/           # 本番環境用スクリプト
+│       │   ├── register-service.sh    # サービス登録スクリプト
+│       │   ├── deploy.sh             # デプロイスクリプト
+│       │   ├── setup.sh              # 初期セットアップスクリプト
+│       │   └── health-check.sh       # ヘルスチェックスクリプト
+│       └── common/               # 共通スクリプト
+│           ├── utils.sh              # 共通ユーティリティ
+│           └── logging.sh            # ログ機能
 ├── scripts/                      # スクリプト
 │   ├── run-tests.sh             # テスト実行スクリプト
 │   └── run-integration-tests.sh # 統合テスト実行スクリプト
@@ -200,6 +209,7 @@ accesslog-tracker/
 - ✅ **テスト環境**: ユニット、統合、E2Eテスト完了
 - ✅ **Docker環境**: 開発・テスト環境構築完了
 - ✅ **ドキュメント**: 包括的な仕様書完了
+- ✅ **本番用スクリプト**: サービス登録・デプロイスクリプト完了
 
 ### 4.2 テスト状況
 - **ユニットテスト**: 100%成功 ✅ **完了**
@@ -220,6 +230,8 @@ accesslog-tracker/
 2. **CI/CDパイプライン**: GitHub Actions設定
 3. **監視・ログ**: CloudWatch設定
 4. **セキュリティ**: WAF、セキュリティグループ設定
+5. **サービス登録スクリプト**: systemdサービス自動登録
+6. **デプロイ自動化**: ロールバック機能付きデプロイ
 
 ### 5.2 機能拡張
 1. **パフォーマンス最適化**: キャッシュ戦略、クエリ最適化

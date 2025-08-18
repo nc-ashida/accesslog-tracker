@@ -355,10 +355,55 @@ deploy-k8s: ## Kubernetesにデプロイ
 .PHONY: deploy-aws
 deploy-aws: ## AWSにデプロイ
 	@echo "AWSにデプロイ中..."
-	aws cloudformation deploy \
-		--template-file deployments/aws/cloudformation/infrastructure.yml \
-		--stack-name $(APP_NAME) \
-		--capabilities CAPABILITY_IAM
+	# AWS ECSデプロイコマンド
+
+.PHONY: setup-production
+setup-production: ## 本番環境の初期セットアップ
+	@echo "本番環境の初期セットアップを実行中..."
+	@if [ -f "./deployments/scripts/production/setup.sh" ]; then \
+		chmod +x ./deployments/scripts/production/setup.sh; \
+		./deployments/scripts/production/setup.sh; \
+	else \
+		echo "セットアップスクリプトが見つかりません"; \
+		exit 1; \
+	fi
+
+.PHONY: register-service
+register-service: ## 本番環境でサービスを登録
+	@echo "本番環境でサービスを登録中..."
+	@if [ -f "./deployments/scripts/production/register-service.sh" ]; then \
+		chmod +x ./deployments/scripts/production/register-service.sh; \
+		./deployments/scripts/production/register-service.sh; \
+	else \
+		echo "サービス登録スクリプトが見つかりません"; \
+		exit 1; \
+	fi
+
+.PHONY: deploy-production
+deploy-production: ## 本番環境にデプロイ
+	@echo "本番環境にデプロイ中..."
+	@if [ -z "$(VERSION)" ]; then \
+		echo "VERSIONを指定してください: make deploy-production VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@if [ -f "./deployments/scripts/production/deploy.sh" ]; then \
+		chmod +x ./deployments/scripts/production/deploy.sh; \
+		./deployments/scripts/production/deploy.sh $(VERSION); \
+	else \
+		echo "デプロイスクリプトが見つかりません"; \
+		exit 1; \
+	fi
+
+.PHONY: health-check-production
+health-check-production: ## 本番環境のヘルスチェック
+	@echo "本番環境のヘルスチェックを実行中..."
+	@if [ -f "./deployments/scripts/production/health-check.sh" ]; then \
+		chmod +x ./deployments/scripts/production/health-check.sh; \
+		./deployments/scripts/production/health-check.sh; \
+	else \
+		echo "ヘルスチェックスクリプトが見つかりません"; \
+		exit 1; \
+	fi
 
 # 監視・ログ
 .PHONY: logs
