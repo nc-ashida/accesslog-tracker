@@ -76,7 +76,7 @@ func TestBeaconHandlerIntegration(t *testing.T) {
 	router.GET("/tracker/:app_id", beaconHandler.ServeCustom) // パラメータのみ
 	router.GET("/tracker.js", beaconHandler.Serve)
 	router.GET("/tracker.min.js", beaconHandler.ServeMinified)
-	router.GET("/beacon", beaconHandler.GenerateBeacon)
+	router.GET("/beacon", beaconHandler.ProcessBeacon)
 	router.GET("/beacon.gif", beaconHandler.ServeGIF)
 	router.POST("/beacon/config", beaconHandler.GenerateBeaconWithConfig)
 	router.GET("/beacon/health", beaconHandler.Health)
@@ -372,5 +372,63 @@ func TestBeaconHandlerIntegration(t *testing.T) {
 		router.ServeHTTP(w2, req2)
 
 		assert.Equal(t, 304, w2.Code) // Not Modified
+	})
+
+	// ProcessBeacon のテスト
+	t.Run("should_process_beacon_request", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/beacon?app_id="+app.AppID+"&session_id=test-session&url=/test-page&referrer=https://example.com&custom_param=value", nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		req.RemoteAddr = "192.168.1.15:12346"
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, "image/gif", w.Header().Get("Content-Type"))
+		assert.Equal(t, "no-cache, no-store, must-revalidate", w.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", w.Header().Get("Pragma"))
+		assert.Equal(t, "0", w.Header().Get("Expires"))
+	})
+
+	t.Run("should_handle_beacon_request_without_app_id", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/beacon?session_id=test-session&url=/test-page", nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, 400, w.Code)
+		assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
+
+		var response apimodels.APIResponse
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.False(t, response.Success)
+		assert.Equal(t, "VALIDATION_ERROR", response.Error.Code)
+		assert.Equal(t, "app_id parameter is required", response.Error.Message)
+	})
+
+	t.Run("should_handle_beacon_request_with_default_url", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/beacon?app_id="+app.AppID+"&session_id=test-session", nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		req.RemoteAddr = "192.168.1.16:12347"
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, "image/gif", w.Header().Get("Content-Type"))
+	})
+
+	t.Run("should_handle_beacon_request_with_custom_params", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/beacon?app_id="+app.AppID+"&session_id=test-session&url=/test-page&param1=value1&param2=value2&param3=value3", nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		req.RemoteAddr = "192.168.1.17:12348"
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, "image/gif", w.Header().Get("Content-Type"))
 	})
 }

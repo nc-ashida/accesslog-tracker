@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strings"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -9,12 +10,15 @@ import (
 func CORS() gin.HandlerFunc {
 	config := cors.DefaultConfig()
 	
-	// 許可するオリジンを設定
+	// 許可するオリジンを設定（静的許可）
 	config.AllowOrigins = []string{
 		"http://localhost:3000",
 		"http://localhost:8080",
 		"https://example.com",
-		"https://*.example.com",
+	}
+	// サブドメイン許可（*.example.com）
+	config.AllowOriginFunc = func(origin string) bool {
+		return strings.HasSuffix(origin, ".example.com") || origin == "https://example.com"
 	}
 	
 	// 許可するHTTPメソッドを設定

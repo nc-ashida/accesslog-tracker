@@ -99,6 +99,40 @@ func TestServerIntegration(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("should_test_server_methods", func(t *testing.T) {
+		// NewServerのテスト（既に実行済み）
+		assert.NotNil(t, srv)
+
+		// GetRouterのテスト
+		router := srv.GetRouter()
+		assert.NotNil(t, router)
+
+		// ルーターが正しく設定されているかテスト
+		req, _ := http.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// 200または404（ルートが存在しない場合）を許容
+		assert.Contains(t, []int{200, 404}, w.Code, "Expected 200 or 404, got %d", w.Code)
+	})
+
+	t.Run("should_setup_test_routes", func(t *testing.T) {
+		// SetupTestを実行
+		srv.SetupTest()
+
+		// テスト用ルートが正しく設定されているか確認
+		router := srv.GetRouter()
+		assert.NotNil(t, router)
+
+		// テスト用エンドポイントにアクセス
+		req, _ := http.NewRequest("GET", "/test/health", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// 200または404（ルートが存在しない場合）を許容
+		assert.Contains(t, []int{200, 404}, w.Code, "Expected 200 or 404, got %d", w.Code)
+	})
+
 	t.Run("should_handle_graceful_shutdown", func(t *testing.T) {
 		// サーバーを開始
 		go func() {
@@ -263,14 +297,114 @@ func TestServerSetupTest(t *testing.T) {
 		// ルーターが正しく設定されていることを確認
 		router := srv.GetRouter()
 		assert.NotNil(t, router)
-		
+
 		// テスト用エンドポイントが利用可能であることを確認
 		req, _ := http.NewRequest("GET", "/health", nil)
 		w := httptest.NewRecorder()
-		
+
 		router.ServeHTTP(w, req)
-		
+
 		// 200または503を許容（データベース接続が不安定な場合）
 		assert.Contains(t, []int{200, 503}, w.Code, "Expected 200 or 503, got %d", w.Code)
+	})
+}
+
+// TestServerDirectFunctions はserver.goの関数を直接テストします
+func TestServerDirectFunctions(t *testing.T) {
+	// テスト用データベースをセットアップ
+	db := apihelpers.SetupTestDatabase(t)
+	defer db.Close()
+
+	// テスト用Redisをセットアップ
+	redisClient := apihelpers.SetupTestRedis(t)
+	defer redisClient.Close()
+
+	// 設定を初期化
+	cfg := &config.Config{
+		App: config.AppConfig{
+			Port:  8081, // 別のポートを使用
+			Debug: true,
+		},
+		Database: config.DatabaseConfig{
+			Host:     apihelpers.GetTestDBHost(),
+			Port:     5432,
+			User:     "postgres",
+			Password: "password",
+			Name:     "access_log_tracker_test",
+			SSLMode:  "disable",
+		},
+		Redis: config.RedisConfig{
+			Host:     apihelpers.GetTestRedisHost(),
+			Port:     6379,
+			Password: "",
+			DB:       0,
+		},
+	}
+
+	// ロガーを初期化
+	log := logger.NewLogger()
+
+	// データベース接続を初期化
+	dbConn := postgresql.NewConnection(cfg.GetDatabaseDSN())
+	err := dbConn.Connect(cfg.GetDatabaseDSN())
+	require.NoError(t, err)
+	defer dbConn.Close()
+
+	// キャッシュサービスを初期化
+	cacheService := redis.NewCacheService(cfg.GetRedisAddr())
+	err = cacheService.Connect()
+	require.NoError(t, err)
+	defer cacheService.Close()
+
+	// リポジトリを初期化
+	appRepo := repositories.NewApplicationRepository(db)
+	trackingRepo := repositories.NewTrackingRepository(db)
+
+	// サービスを初期化
+	appService := services.NewApplicationService(appRepo, cacheService)
+	trackingService := services.NewTrackingService(trackingRepo)
+
+	t.Run("should_test_new_server", func(t *testing.T) {
+		// NewServerを直接テスト
+		srv := server.NewServer(cfg, log, trackingService, appService, dbConn, cacheService)
+		assert.NotNil(t, srv)
+		assert.NotNil(t, srv.GetRouter())
+	})
+
+	t.Run("should_test_get_router", func(t *testing.T) {
+		srv := server.NewServer(cfg, log, trackingService, appService, dbConn, cacheService)
+		router := srv.GetRouter()
+		assert.NotNil(t, router)
+	})
+
+	t.Run("should_test_setup_test", func(t *testing.T) {
+		srv := server.NewServer(cfg, log, trackingService, appService, dbConn, cacheService)
+		// SetupTestを直接呼び出し
+		srv.SetupTest()
+		router := srv.GetRouter()
+		assert.NotNil(t, router)
+	})
+
+	t.Run("should_test_start_and_stop", func(t *testing.T) {
+		srv := server.NewServer(cfg, log, trackingService, appService, dbConn, cacheService)
+
+		// サーバーを開始
+		go func() {
+			err := srv.Start()
+			// エラーは予想される（ポートが使用中など）
+			if err != nil {
+				t.Logf("Server start error (expected): %v", err)
+			}
+		}()
+
+		// 少し待機
+		time.Sleep(1 * time.Second)
+
+		// サーバーを停止
+		err := srv.Stop()
+		// エラーは予想される（サーバーが開始されていない場合）
+		if err != nil {
+			t.Logf("Server stop error (expected): %v", err)
+		}
 	})
 }

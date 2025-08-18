@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-	_ "github.com/lib/pq"
-	"github.com/stretchr/testify/require"
 	"accesslog-tracker/internal/domain/models"
+
+	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 )
 
 // GetTestDBHost はテスト用データベースのホストを取得します
@@ -42,11 +43,11 @@ func SetupTestDatabase(t *testing.T) *sql.DB {
 	dsn := "host=" + host + " port=5432 user=postgres password=password dbname=access_log_tracker_test sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	require.NoError(t, err)
-	
+
 	// 接続テスト
 	err = db.Ping()
 	require.NoError(t, err)
-	
+
 	return db
 }
 
@@ -58,19 +59,19 @@ func SetupTestRedis(t *testing.T) *redis.Client {
 		Password: "",
 		DB:       0,
 	})
-	
+
 	// 接続テスト
 	ctx := context.Background()
 	err := client.Ping(ctx).Err()
 	require.NoError(t, err)
-	
+
 	return client
 }
 
 // CleanupTestData はテストデータをクリーンアップします
 func CleanupTestData(t *testing.T, db *sql.DB) {
 	tables := []string{"custom_parameters", "access_logs", "sessions", "applications"}
-	
+
 	for _, table := range tables {
 		_, err := db.Exec("TRUNCATE TABLE " + table + " CASCADE")
 		require.NoError(t, err)
@@ -82,7 +83,7 @@ func CreateTestApplication(t *testing.T, db *sql.DB) *models.Application {
 	// より一意なIDを生成
 	timestamp := time.Now().UnixNano()
 	randomSuffix := RandomString(8)
-	
+
 	app := &models.Application{
 		AppID:       fmt.Sprintf("test_app_%d_%s", timestamp, randomSuffix),
 		Name:        "Test Application",
@@ -93,14 +94,14 @@ func CreateTestApplication(t *testing.T, db *sql.DB) *models.Application {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	
+
 	_, err := db.Exec(`
-		INSERT INTO applications (app_id, name, description, domain, api_key, active, created_at, updated_at)
+		INSERT INTO applications (app_id, name, description, domain, api_key, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (app_id) DO NOTHING
 	`, app.AppID, app.Name, app.Description, app.Domain, app.APIKey, app.Active, app.CreatedAt, app.UpdatedAt)
 	require.NoError(t, err)
-	
+
 	return app
 }
 
@@ -115,15 +116,15 @@ func CreateTestTrackingData(t *testing.T, db *sql.DB, appID string) *models.Trac
 		SessionID: "alt_" + time.Now().Format("20060102150405") + "_" + RandomString(9),
 		Timestamp: time.Now(),
 	}
-	
+
 	_, err := db.Exec(`
 		INSERT INTO access_logs (id, app_id, user_agent, url, ip_address, session_id, timestamp)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (id) DO NOTHING
-	`, trackingData.ID, trackingData.AppID, trackingData.UserAgent, 
+	`, trackingData.ID, trackingData.AppID, trackingData.UserAgent,
 		trackingData.URL, trackingData.IPAddress, trackingData.SessionID, trackingData.Timestamp)
 	require.NoError(t, err)
-	
+
 	return trackingData
 }
 
@@ -144,11 +145,11 @@ func GetTestApplicationByID(t *testing.T, db *sql.DB, appID string) *models.Appl
 		SELECT app_id, name, description, domain, api_key, active, created_at, updated_at
 		FROM applications WHERE app_id = $1
 	`, appID).Scan(&app.AppID, &app.Name, &app.Description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt)
-	
+
 	if err != nil {
 		return nil
 	}
-	
+
 	return &app
 }
 
@@ -159,11 +160,11 @@ func GetTestTrackingDataByID(t *testing.T, db *sql.DB, trackingID string) *model
 		SELECT id, app_id, user_agent, url, ip_address, session_id, timestamp
 		FROM access_logs WHERE id = $1
 	`, trackingID).Scan(&tracking.ID, &tracking.AppID, &tracking.UserAgent, &tracking.URL, &tracking.IPAddress, &tracking.SessionID, &tracking.Timestamp)
-	
+
 	if err != nil {
 		return nil
 	}
-	
+
 	return &tracking
 }
 
@@ -205,13 +206,13 @@ func RandomString(length int) string {
 func SetupTestEnvironment(t *testing.T) (*sql.DB, *redis.Client) {
 	// データベースをセットアップ
 	db := SetupTestDatabase(t)
-	
+
 	// Redisをセットアップ
 	redisClient := SetupTestRedis(t)
-	
+
 	// テストデータをクリーンアップ
 	CleanupTestData(t, db)
-	
+
 	return db, redisClient
 }
 
@@ -219,7 +220,7 @@ func SetupTestEnvironment(t *testing.T) (*sql.DB, *redis.Client) {
 func TeardownTestEnvironment(t *testing.T, db *sql.DB, redisClient *redis.Client) {
 	// テストデータをクリーンアップ
 	CleanupTestData(t, db)
-	
+
 	// 接続を閉じる
 	if db != nil {
 		db.Close()

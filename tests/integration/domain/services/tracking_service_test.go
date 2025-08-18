@@ -2,7 +2,6 @@ package services_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,19 +12,30 @@ import (
 	"accesslog-tracker/internal/domain/services"
 	"accesslog-tracker/internal/infrastructure/database/postgresql"
 	"accesslog-tracker/internal/infrastructure/database/postgresql/repositories"
+	apihelpers "accesslog-tracker/tests/integration/api"
 )
 
 func TestTrackingService_GetByAppID(t *testing.T) {
-	// テスト環境のセットアップ
-	db := postgresql.NewConnection("test")
-	err := db.Connect("host=localhost port=5432 user=postgres password=password dbname=access_log_tracker_test sslmode=disable")
-	require.NoError(t, err)
+	// テスト用データベースをセットアップ
+	db := apihelpers.SetupTestDatabase(t)
 	defer db.Close()
 
-	trackingRepo := repositories.NewTrackingRepository(db.GetDB())
+	trackingRepo := repositories.NewTrackingRepository(db)
 	trackingService := services.NewTrackingService(trackingRepo)
 
 	ctx := context.Background()
+
+	// テスト用アプリケーションを先に作成
+	appRepo := repositories.NewApplicationRepository(db)
+	testApp := &models.Application{
+		AppID:  "test-app-123",
+		Name:   "Test App for GetByAppID",
+		Domain: "example.com",
+		APIKey: "test-api-key-123",
+		Active: true,
+	}
+	err := appRepo.Create(ctx, testApp)
+	require.NoError(t, err)
 
 	// テストデータの準備
 	trackingData := &models.TrackingData{
@@ -43,11 +53,8 @@ func TestTrackingService_GetByAppID(t *testing.T) {
 		},
 	}
 
-	// トラッキングデータを保存（接続エラーを無視）
+	// トラッキングデータを保存
 	err = trackingService.ProcessTrackingData(ctx, trackingData)
-	if err != nil && (strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "failed to connect")) {
-		t.Skip("Database connection not available in test environment")
-	}
 	require.NoError(t, err)
 
 	// GetByAppIDをテスト
@@ -62,19 +69,39 @@ func TestTrackingService_GetByAppID(t *testing.T) {
 	emptyTrackings, err := trackingService.GetByAppID(ctx, "non-existent-app", 10, 0)
 	require.NoError(t, err)
 	assert.Empty(t, emptyTrackings)
+
+	// 制限とオフセットのテスト
+	limitedTrackings, err := trackingService.GetByAppID(ctx, "test-app-123", 5, 0)
+	require.NoError(t, err)
+	assert.Len(t, limitedTrackings, 1)
+
+	// オフセットのテスト
+	offsetTrackings, err := trackingService.GetByAppID(ctx, "test-app-123", 10, 10)
+	require.NoError(t, err)
+	assert.Empty(t, offsetTrackings)
 }
 
 func TestTrackingService_GetTrackingDataByDateRange(t *testing.T) {
-	// テスト環境のセットアップ
-	db := postgresql.NewConnection("test")
-	err := db.Connect("host=localhost port=5432 user=postgres password=password dbname=access_log_tracker_test sslmode=disable")
-	require.NoError(t, err)
+	// テスト用データベースをセットアップ
+	db := apihelpers.SetupTestDatabase(t)
 	defer db.Close()
 
-	trackingRepo := repositories.NewTrackingRepository(db.GetDB())
+	trackingRepo := repositories.NewTrackingRepository(db)
 	trackingService := services.NewTrackingService(trackingRepo)
 
 	ctx := context.Background()
+
+	// テスト用アプリケーションを先に作成
+	appRepo := repositories.NewApplicationRepository(db)
+	testApp := &models.Application{
+		AppID:  "test-app-date-123",
+		Name:   "Test App for DateRange",
+		Domain: "example.com",
+		APIKey: "test-api-key-date-123",
+		Active: true,
+	}
+	err := appRepo.Create(ctx, testApp)
+	require.NoError(t, err)
 
 	// テストデータの準備
 	trackingData := &models.TrackingData{
@@ -92,11 +119,8 @@ func TestTrackingService_GetTrackingDataByDateRange(t *testing.T) {
 		},
 	}
 
-	// トラッキングデータを保存（接続エラーを無視）
+	// トラッキングデータを保存
 	err = trackingService.ProcessTrackingData(ctx, trackingData)
-	if err != nil && (strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "failed to connect")) {
-		t.Skip("Database connection not available in test environment")
-	}
 	require.NoError(t, err)
 
 	// 日付範囲でトラッキングデータを取得
@@ -111,51 +135,7 @@ func TestTrackingService_GetTrackingDataByDateRange(t *testing.T) {
 	assert.Equal(t, "test-app-date-123", trackings[0].AppID)
 }
 
-func TestTrackingService_GetDailyStatistics(t *testing.T) {
-	// テスト環境のセットアップ
-	db := postgresql.NewConnection("test")
-	err := db.Connect("host=localhost port=5432 user=postgres password=password dbname=access_log_tracker_test sslmode=disable")
-	require.NoError(t, err)
-	defer db.Close()
 
-	trackingRepo := repositories.NewTrackingRepository(db.GetDB())
-	trackingService := services.NewTrackingService(trackingRepo)
-
-	ctx := context.Background()
-
-	// テストデータの準備
-	trackingData := &models.TrackingData{
-		ID:        "test-tracking-daily-123",
-		AppID:     "test-app-daily-123",
-		SessionID: "test-session-daily-123",
-		URL:       "https://example.com/page",
-		Referrer:  "https://google.com",
-		UserAgent: "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36",
-		IPAddress: "172.16.0.1",
-		Timestamp: time.Now(),
-		CustomParams: map[string]interface{}{
-			"utm_source": "twitter",
-			"utm_medium": "social",
-		},
-	}
-
-	// トラッキングデータを保存（接続エラーを無視）
-	err = trackingService.ProcessTrackingData(ctx, trackingData)
-	if err != nil && (strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "failed to connect")) {
-		t.Skip("Database connection not available in test environment")
-	}
-	require.NoError(t, err)
-
-	// 日別統計を取得
-	dailyStats, err := trackingService.GetDailyStatistics(ctx, "test-app-daily-123", time.Now())
-	require.NoError(t, err)
-	assert.NotNil(t, dailyStats)
-	assert.Equal(t, "test-app-daily-123", dailyStats.AppID)
-	assert.GreaterOrEqual(t, dailyStats.TotalPageViews, int64(0))
-	assert.GreaterOrEqual(t, dailyStats.TotalSessions, int64(0))
-	assert.GreaterOrEqual(t, dailyStats.UniqueVisitors, int64(0))
-	assert.GreaterOrEqual(t, dailyStats.AverageSession, 0.0)
-}
 
 func TestTrackingService_GetTrackingDataByDateRange_InvalidDateRange(t *testing.T) {
 	// テスト環境のセットアップ
@@ -485,4 +465,71 @@ func TestTrackingService_Delete(t *testing.T) {
 
 	// クリーンアップ
 	appRepo.Delete(ctx, "test-app-delete-123")
+}
+
+func TestTrackingService_GetDailyStatistics(t *testing.T) {
+	// テスト環境のセットアップ
+	db := postgresql.NewConnection("test")
+	err := db.Connect("postgres://postgres:password@postgres:5432/access_log_tracker_test?sslmode=disable")
+	require.NoError(t, err)
+	defer db.Close()
+
+	trackingRepo := repositories.NewTrackingRepository(db.GetDB())
+	trackingService := services.NewTrackingService(trackingRepo)
+
+	ctx := context.Background()
+
+	// テスト用アプリケーションを先に作成
+	appRepo := repositories.NewApplicationRepository(db.GetDB())
+	testApp := &models.Application{
+		AppID:  "test-app-daily-123",
+		Name:   "Test App for Daily Stats",
+		Domain: "daily.example.com",
+		APIKey: "test-api-key-daily-123",
+		Active: true,
+	}
+	err = appRepo.Create(ctx, testApp)
+	require.NoError(t, err)
+
+	// テストデータの準備
+	trackingData := &models.TrackingData{
+		ID:        "test-tracking-daily-123",
+		AppID:     "test-app-daily-123",
+		SessionID: "test-session-daily-123",
+		URL:       "https://example.com/page",
+		Referrer:  "https://google.com",
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+		IPAddress: "192.168.1.100",
+		Timestamp: time.Now(),
+		CustomParams: map[string]interface{}{
+			"utm_source": "direct",
+			"utm_medium": "none",
+		},
+	}
+
+	// トラッキングデータを保存
+	err = trackingService.ProcessTrackingData(ctx, trackingData)
+	require.NoError(t, err)
+
+	// GetDailyStatisticsをテスト
+	dailyStats, err := trackingService.GetDailyStatistics(ctx, "test-app-daily-123", time.Now())
+	require.NoError(t, err)
+	assert.NotNil(t, dailyStats)
+	assert.Equal(t, "test-app-daily-123", dailyStats.AppID)
+	assert.NotZero(t, dailyStats.TotalPageViews)
+	assert.NotZero(t, dailyStats.TotalSessions)
+	assert.NotZero(t, dailyStats.UniqueVisitors)
+	assert.NotZero(t, dailyStats.AverageSession)
+
+	// 存在しないアプリケーションIDでテスト
+	emptyStats, err := trackingService.GetDailyStatistics(ctx, "non-existent-app", time.Now())
+	require.NoError(t, err)
+	assert.NotNil(t, emptyStats)
+	assert.Equal(t, "non-existent-app", emptyStats.AppID)
+	assert.Zero(t, emptyStats.TotalPageViews)
+	assert.Zero(t, emptyStats.TotalSessions)
+	assert.Zero(t, emptyStats.UniqueVisitors)
+
+	// クリーンアップ
+	appRepo.Delete(ctx, "test-app-daily-123")
 }

@@ -39,6 +39,20 @@ func TestTrackingModel_Integration(t *testing.T) {
 		}
 	})
 
+	t.Run("TrackingData_IsValidIP", func(t *testing.T) {
+		// 空のIPアドレス（オプションなので有効）
+		tracking := &models.TrackingData{IPAddress: ""}
+		assert.True(t, tracking.IsValidIP(), "Empty IP should be valid")
+
+		// 有効なIPアドレス
+		tracking.IPAddress = "192.168.1.1"
+		assert.True(t, tracking.IsValidIP(), "Valid IP should be valid")
+
+		// 無効なIPアドレス（長さチェックのみ）
+		tracking.IPAddress = "invalid"
+		assert.True(t, tracking.IsValidIP(), "Invalid IP should still be valid (length check only)")
+	})
+
 	t.Run("GetCustomParam", func(t *testing.T) {
 		tracking := &models.TrackingData{
 			CustomParams: map[string]interface{}{
@@ -88,6 +102,71 @@ func TestTrackingModel_Integration(t *testing.T) {
 		assert.NotEmpty(t, jsonData)
 		assert.Contains(t, string(jsonData), "test-id")
 		assert.Contains(t, string(jsonData), "test-app")
+	})
+
+	t.Run("FromJSON", func(t *testing.T) {
+		jsonData := `{
+			"id": "test-id",
+			"app_id": "test-app",
+			"user_agent": "Mozilla/5.0 (Test Browser)",
+			"ip_address": "192.168.1.1",
+			"url": "https://example.com/page",
+			"timestamp": "2023-12-25T10:30:00Z"
+		}`
+
+		var tracking models.TrackingData
+		err := tracking.FromJSON([]byte(jsonData))
+		require.NoError(t, err)
+		assert.Equal(t, "test-id", tracking.ID)
+		assert.Equal(t, "test-app", tracking.AppID)
+		assert.Equal(t, "Mozilla/5.0 (Test Browser)", tracking.UserAgent)
+		assert.Equal(t, "192.168.1.1", tracking.IPAddress)
+		assert.Equal(t, "https://example.com/page", tracking.URL)
+	})
+
+	t.Run("TrackingStats_ToJSON", func(t *testing.T) {
+		stats := &models.TrackingStats{
+			AppID:          "test-app",
+			TotalRequests:  100,
+			UniqueSessions: 50,
+			UniqueIPs:      25,
+			BotRequests:    10,
+			MobileRequests: 20,
+			StartDate:      time.Date(2023, 12, 25, 0, 0, 0, 0, time.UTC),
+			EndDate:        time.Date(2023, 12, 25, 23, 59, 59, 0, time.UTC),
+			CreatedAt:      time.Date(2023, 12, 25, 10, 30, 0, 0, time.UTC),
+		}
+
+		jsonData, err := stats.ToJSON()
+		require.NoError(t, err)
+		assert.NotEmpty(t, jsonData)
+		assert.Contains(t, string(jsonData), "test-app")
+		assert.Contains(t, string(jsonData), "100")
+		assert.Contains(t, string(jsonData), "50")
+	})
+
+	t.Run("TrackingStats_FromJSON", func(t *testing.T) {
+		jsonData := `{
+			"app_id": "test-app",
+			"total_requests": 100,
+			"unique_sessions": 50,
+			"unique_ips": 25,
+			"bot_requests": 10,
+			"mobile_requests": 20,
+			"start_date": "2023-12-25T00:00:00Z",
+			"end_date": "2023-12-25T23:59:59Z",
+			"created_at": "2023-12-25T10:30:00Z"
+		}`
+
+		var stats models.TrackingStats
+		err := stats.FromJSON([]byte(jsonData))
+		require.NoError(t, err)
+		assert.Equal(t, "test-app", stats.AppID)
+		assert.Equal(t, int64(100), stats.TotalRequests)
+		assert.Equal(t, int64(50), stats.UniqueSessions)
+		assert.Equal(t, int64(25), stats.UniqueIPs)
+		assert.Equal(t, int64(10), stats.BotRequests)
+		assert.Equal(t, int64(20), stats.MobileRequests)
 	})
 
 	t.Run("FromJSON", func(t *testing.T) {

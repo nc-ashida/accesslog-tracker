@@ -168,6 +168,38 @@ test-security: ## セキュリティテストを実行
 	@echo "セキュリティテストを実行中..."
 	go test -v ./tests/security/...
 
+.PHONY: test-security-container
+test-security-container: ## Dockerコンテナ環境でセキュリティテストを実行
+	@echo "Dockerコンテナ環境でセキュリティテストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-security
+
+.PHONY: test-security-setup
+test-security-setup: ## セキュリティテスト環境をセットアップ
+	@echo "セキュリティテスト環境をセットアップ中..."
+	docker-compose -f docker-compose.test.yml up -d postgres redis test-app
+	@echo "データベースとRedisの起動を待機中..."
+	sleep 15
+	@echo "テスト用データベースをセットアップ中..."
+	docker-compose -f docker-compose.test.yml exec -T postgres psql -U postgres -d access_log_tracker_test -f /docker-entrypoint-initdb.d/01_init_test_db.sql
+	@echo "セキュリティテスト環境のセットアップが完了しました"
+
+.PHONY: test-security-run
+test-security-run: ## セキュリティテストを実行（環境は起動済み）
+	@echo "セキュリティテストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-security
+
+.PHONY: test-security-full
+test-security-full: ## セキュリティテストを完全実行（セットアップから実行まで）
+	@echo "セキュリティテストを完全実行中..."
+	make test-security-setup
+	make test-security-run
+	@echo "セキュリティテストの実行が完了しました"
+
+.PHONY: test-security-cleanup
+test-security-cleanup: ## セキュリティテスト環境をクリーンアップ
+	@echo "セキュリティテスト環境をクリーンアップ中..."
+	docker-compose -f docker-compose.test.yml down -v
+
 .PHONY: test-coverage
 test-coverage: ## テストカバレッジを実行
 	@echo "テストカバレッジを実行中..."
@@ -265,6 +297,33 @@ test-performance-container: ## Dockerコンテナ環境でパフォーマンス�
 	@echo "Dockerコンテナ環境でパフォーマンステストを実行中..."
 	docker-compose -f docker-compose.test.yml run --rm test-runner make test-performance
 
+.PHONY: test-performance-setup
+test-performance-setup: ## パフォーマンステスト環境をセットアップ
+	@echo "パフォーマンステスト環境をセットアップ中..."
+	docker-compose -f docker-compose.test.yml up -d postgres redis
+	@echo "データベースとRedisの起動を待機中..."
+	sleep 15
+	@echo "テスト用データベースをセットアップ中..."
+	docker-compose -f docker-compose.test.yml exec -T postgres psql -U postgres -d access_log_tracker_test -f /docker-entrypoint-initdb.d/01_init_test_db.sql
+	@echo "パフォーマンステスト環境のセットアップが完了しました"
+
+.PHONY: test-performance-run
+test-performance-run: ## パフォーマンステストを実行（環境は起動済み）
+	@echo "パフォーマンステストを実行中..."
+	docker-compose -f docker-compose.test.yml run --rm test-runner make test-performance
+
+.PHONY: test-performance-full
+test-performance-full: ## パフォーマンステストを完全実行（セットアップから実行まで）
+	@echo "パフォーマンステストを完全実行中..."
+	make test-performance-setup
+	make test-performance-run
+	@echo "パフォーマンステストの実行が完了しました"
+
+.PHONY: test-performance-cleanup
+test-performance-cleanup: ## パフォーマンステスト環境をクリーンアップ
+	@echo "パフォーマンステスト環境をクリーンアップ中..."
+	docker-compose -f docker-compose.test.yml down -v
+
 .PHONY: test-coverage-container
 test-coverage-container: ## Dockerコンテナ環境でカバレッジテストを実行
 	@echo "Dockerコンテナ環境でカバレッジテストを実行中..."
@@ -273,10 +332,10 @@ test-coverage-container: ## Dockerコンテナ環境でカバレッジテスト�
 .PHONY: test-setup-db
 test-setup-db: ## テスト用データベースをセットアップ
 	@echo "テスト用データベースをセットアップ中..."
-	docker-compose exec postgres psql -U postgres -c "CREATE DATABASE IF NOT EXISTS access_log_tracker_test;"
-	docker-compose exec postgres psql -U postgres -c "CREATE DATABASE IF NOT EXISTS access_log_tracker_e2e;"
-	docker-compose exec postgres psql -U postgres -c "CREATE DATABASE IF NOT EXISTS access_log_tracker_perf;"
-	docker-compose exec postgres psql -U postgres -c "CREATE DATABASE IF NOT EXISTS access_log_tracker_security;"
+	docker-compose -f docker-compose.test.yml exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_test;" || true
+	docker-compose -f docker-compose.test.yml exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_e2e;" || true
+	docker-compose -f docker-compose.test.yml exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_perf;" || true
+	docker-compose -f docker-compose.test.yml exec postgres psql -U postgres -c "CREATE DATABASE access_log_tracker_security;" || true
 	@echo "テスト用データベースのセットアップが完了しました"
 
 # リント・フォーマット

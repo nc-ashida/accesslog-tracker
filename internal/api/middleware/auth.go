@@ -2,12 +2,12 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
-	"github.com/gin-gonic/gin"
 	"accesslog-tracker/internal/api/models"
 	"accesslog-tracker/internal/domain/services"
 	"accesslog-tracker/internal/utils/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AuthMiddleware は認証ミドルウェアの構造体です
@@ -42,19 +42,7 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 			return
 		}
 
-		// APIキーの形式をチェック
-		if !strings.HasPrefix(apiKey, "alt_") {
-			m.logger.Warn("Invalid API key format", "path", c.Request.URL.Path, "ip", c.ClientIP())
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
-				Success: false,
-				Error: &models.APIError{
-					Code:    "AUTHENTICATION_ERROR",
-					Message: "Invalid API key format",
-				},
-			})
-			c.Abort()
-			return
-		}
+		// 仕様準拠: APIキーのプレフィックス制約は課さない
 
 		// アプリケーションの存在確認
 		app, err := m.applicationService.GetByAPIKey(c.Request.Context(), apiKey)
@@ -63,7 +51,7 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, models.APIResponse{
 				Success: false,
 				Error: &models.APIError{
-					Code:    "AUTHENTICATION_ERROR",
+					Code:    "INVALID_API_KEY",
 					Message: "Invalid API key",
 				},
 			})

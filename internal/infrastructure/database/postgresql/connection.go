@@ -27,10 +27,10 @@ func (c *Connection) Connect(dsn string) error {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// 接続設定
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	// 接続設定（パフォーマンス最適化）
+	db.SetMaxOpenConns(100)  // 同時接続数を増加
+	db.SetMaxIdleConns(50)   // アイドル接続数を増加
+	db.SetConnMaxLifetime(10 * time.Minute)  // 接続寿命を延長
 
 	c.db = db
 	return nil

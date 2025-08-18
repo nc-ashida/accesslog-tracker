@@ -1,12 +1,13 @@
 package repositories
 
 import (
+	"accesslog-tracker/internal/domain/models"
 	"context"
 	"database/sql"
 	"fmt"
 	"time"
+
 	"github.com/google/uuid"
-	"accesslog-tracker/internal/domain/models"
 )
 
 // ApplicationRepository PostgreSQL用のアプリケーションリポジトリ実装
@@ -38,12 +39,12 @@ func (r *ApplicationRepository) Create(ctx context.Context, app *models.Applicat
 
 	query := `
 		INSERT INTO applications (
-			app_id, name, description, domain, api_key, active, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			app_id, name, domain, api_key, is_active, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		app.AppID, app.Name, app.Description, app.Domain, app.APIKey, app.Active, app.CreatedAt, app.UpdatedAt,
+		app.AppID, app.Name, app.Domain, app.APIKey, app.Active, app.CreatedAt, app.UpdatedAt,
 	)
 
 	if err != nil {
@@ -56,14 +57,15 @@ func (r *ApplicationRepository) Create(ctx context.Context, app *models.Applicat
 // GetByID アプリケーションIDでアプリケーションを検索
 func (r *ApplicationRepository) GetByID(ctx context.Context, appID string) (*models.Application, error) {
 	query := `
-		SELECT app_id, name, description, domain, api_key, active, created_at, updated_at
+		SELECT app_id, name, description, domain, api_key, is_active, created_at, updated_at
 		FROM applications 
 		WHERE app_id = $1
 	`
 
 	var app models.Application
+	var description sql.NullString
 	err := r.db.QueryRowContext(ctx, query, appID).Scan(
-		&app.AppID, &app.Name, &app.Description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
+		&app.AppID, &app.Name, &description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
 	)
 
 	if err != nil {
@@ -73,20 +75,28 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, appID string) (*mod
 		return nil, fmt.Errorf("failed to query application: %w", err)
 	}
 
+	// NULLの場合は空文字列に変換
+	if description.Valid {
+		app.Description = description.String
+	} else {
+		app.Description = ""
+	}
+
 	return &app, nil
 }
 
 // GetByAPIKey APIキーでアプリケーションを検索
 func (r *ApplicationRepository) GetByAPIKey(ctx context.Context, apiKey string) (*models.Application, error) {
 	query := `
-		SELECT app_id, name, description, domain, api_key, active, created_at, updated_at
+		SELECT app_id, name, description, domain, api_key, is_active, created_at, updated_at
 		FROM applications 
 		WHERE api_key = $1
 	`
 
 	var app models.Application
+	var description sql.NullString
 	err := r.db.QueryRowContext(ctx, query, apiKey).Scan(
-		&app.AppID, &app.Name, &app.Description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
+		&app.AppID, &app.Name, &description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
 	)
 
 	if err != nil {
@@ -96,13 +106,20 @@ func (r *ApplicationRepository) GetByAPIKey(ctx context.Context, apiKey string) 
 		return nil, fmt.Errorf("failed to query application by API key: %w", err)
 	}
 
+	// NULLの場合は空文字列に変換
+	if description.Valid {
+		app.Description = description.String
+	} else {
+		app.Description = ""
+	}
+
 	return &app, nil
 }
 
 // List すべてのアプリケーションをページネーション付きで取得
 func (r *ApplicationRepository) List(ctx context.Context, limit, offset int) ([]*models.Application, error) {
 	query := `
-		SELECT app_id, name, description, domain, api_key, active, created_at, updated_at
+		SELECT app_id, name, description, domain, api_key, is_active, created_at, updated_at
 		FROM applications 
 		ORDER BY created_at DESC 
 		LIMIT $1 OFFSET $2
@@ -132,7 +149,7 @@ func (r *ApplicationRepository) Update(ctx context.Context, app *models.Applicat
 
 	query := `
 		UPDATE applications 
-		SET name = $2, description = $3, domain = $4, api_key = $5, active = $6, updated_at = $7
+		SET name = $2, description = $3, domain = $4, api_key = $5, is_active = $6, updated_at = $7
 		WHERE app_id = $1
 	`
 
@@ -180,13 +197,21 @@ func (r *ApplicationRepository) Delete(ctx context.Context, appID string) error 
 // scanApplication データベースの行をアプリケーションに変換
 func (r *ApplicationRepository) scanApplication(rows *sql.Rows) (*models.Application, error) {
 	var app models.Application
+	var description sql.NullString
 
 	err := rows.Scan(
-		&app.AppID, &app.Name, &app.Description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
+		&app.AppID, &app.Name, &description, &app.Domain, &app.APIKey, &app.Active, &app.CreatedAt, &app.UpdatedAt,
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan application: %w", err)
+	}
+
+	// NULLの場合は空文字列に変換
+	if description.Valid {
+		app.Description = description.String
+	} else {
+		app.Description = ""
 	}
 
 	return &app, nil
@@ -214,23 +239,23 @@ func (r *ApplicationRepository) GetByUserID(ctx context.Context, userID string, 
 // RegenerateAPIKey APIキーを再生成
 func (r *ApplicationRepository) RegenerateAPIKey(ctx context.Context, id string) (string, error) {
 	newAPIKey := uuid.New().String()
-	
+
 	query := `UPDATE applications SET api_key = $2, updated_at = $3 WHERE app_id = $1`
-	
+
 	result, err := r.db.ExecContext(ctx, query, id, newAPIKey, time.Now())
 	if err != nil {
 		return "", fmt.Errorf("failed to regenerate API key: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return "", fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return "", models.ErrApplicationNotFound
 	}
-	
+
 	return newAPIKey, nil
 }
 

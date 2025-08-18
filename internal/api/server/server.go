@@ -61,13 +61,13 @@ func NewServer(
 	// ルートを設定
 	routes.Setup(router, trackingService, applicationService, dbConn, redisConn, logger)
 
-	// HTTPサーバーを作成
+	// HTTPサーバーを作成（パフォーマンス最適化）
 	server.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", config.App.Port),
 		Handler:      router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  10 * time.Second,  // 短縮
+		WriteTimeout: 10 * time.Second,  // 短縮
+		IdleTimeout:  120 * time.Second, // 延長
 	}
 
 	return server

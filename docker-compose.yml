@@ -3,9 +3,13 @@ version: '3.8'
 services:
   # アプリケーション
   app:
+    platform: linux/arm64
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TARGETOS: linux
+        TARGETARCH: arm64
     container_name: access-log-tracker-app
     environment:
       - APP_ENV=development
@@ -56,6 +60,7 @@ services:
 
   # PostgreSQL データベース
   postgres:
+    platform: linux/arm64
     image: postgres:15-alpine
     container_name: access-log-tracker-postgres
     environment:
@@ -78,6 +83,7 @@ services:
 
   # Redis キャッシュ
   redis:
+    platform: linux/arm64
     image: redis:7-alpine
     container_name: access-log-tracker-redis
     command: redis-server --appendonly yes --requirepass ""

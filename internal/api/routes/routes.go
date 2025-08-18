@@ -77,6 +77,9 @@ func Setup(
 	router.GET("/tracker.js", beaconHandler.Serve)
 	router.GET("/tracker.min.js", beaconHandler.ServeMinified)
 	router.GET("/tracker/:app_id.js", beaconHandler.ServeCustom)
+	
+	// ビーコンエンドポイント（認証不要）
+	router.GET("/beacon", beaconHandler.ProcessBeacon)
 
 	// 404ハンドラー
 	router.NoRoute(middleware.NotFoundHandler())
@@ -148,6 +151,9 @@ func SetupTest(
 	router.GET("/tracker.js", beaconHandler.Serve)
 	router.GET("/tracker.min.js", beaconHandler.ServeMinified)
 	router.GET("/tracker/:app_id.js", beaconHandler.ServeCustom)
+	
+	// ビーコンエンドポイント（テスト用）
+	router.GET("/beacon", beaconHandler.ProcessBeacon)
 
 	// 404ハンドラー
 	router.NoRoute(middleware.NotFoundHandler())

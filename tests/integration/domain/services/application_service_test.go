@@ -321,8 +321,6 @@ func TestApplicationService_ValidateAPIKey(t *testing.T) {
 	})
 }
 
-
-
 func TestApplicationService_RegenerateAPIKey(t *testing.T) {
 	// テスト環境のセットアップ
 	db := postgresql.NewConnection("test")
@@ -436,8 +434,6 @@ func TestApplicationService_UpdateSettings(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, updatedApp)
 }
-
-
 
 func TestApplicationService_RegenerateAPIKey_NonExistentApp(t *testing.T) {
 	// テスト環境のセットアップ

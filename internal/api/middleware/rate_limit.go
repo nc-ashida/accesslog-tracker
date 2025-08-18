@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
-	"golang.org/x/net/context"
 	"accesslog-tracker/internal/api/models"
 	"accesslog-tracker/internal/utils/iputil"
 	"accesslog-tracker/internal/utils/logger"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"golang.org/x/net/context"
 )
 
 // RateLimitConfig はレート制限の設定です
@@ -92,8 +93,8 @@ func (m *RateLimitMiddleware) checkRateLimit(ctx context.Context, key string, li
 
 func DefaultRateLimitConfig() RateLimitConfig {
 	return RateLimitConfig{
-		RequestsPerMinute: 1000,
-		RequestsPerHour:   10000,
-		BurstSize:         100,
+		RequestsPerMinute: 2000,  // 増加
+		RequestsPerHour:   20000, // 増加
+		BurstSize:         200,   // 増加
 	}
 }

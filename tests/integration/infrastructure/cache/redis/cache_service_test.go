@@ -98,6 +98,51 @@ func TestCacheService_Integration(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
+	t.Run("should get TTL for key", func(t *testing.T) {
+		key := "test_ttl_key"
+		value := "test_ttl_value"
+		ttl := time.Minute
+
+		// 値を設定
+		err := cache.Set(ctx, key, value, ttl)
+		assert.NoError(t, err)
+
+		// TTLを取得
+		resultTTL, err := cache.TTL(ctx, key)
+		assert.NoError(t, err)
+		assert.Greater(t, resultTTL, time.Duration(0))
+		assert.LessOrEqual(t, resultTTL, ttl)
+
+		// 存在しないキーのTTL
+		_, err = cache.TTL(ctx, "non_existent_key")
+		assert.Error(t, err)
+	})
+
+	t.Run("should set expiration for key", func(t *testing.T) {
+		key := "test_expire_set_key"
+		value := "test_expire_set_value"
+		initialTTL := time.Hour
+		newTTL := time.Minute
+
+		// 値を設定（長いTTL）
+		err := cache.Set(ctx, key, value, initialTTL)
+		assert.NoError(t, err)
+
+		// 新しいTTLを設定
+		err = cache.Expire(ctx, key, newTTL)
+		assert.NoError(t, err)
+
+		// TTLを確認
+		resultTTL, err := cache.TTL(ctx, key)
+		assert.NoError(t, err)
+		assert.Greater(t, resultTTL, time.Duration(0))
+		assert.LessOrEqual(t, resultTTL, newTTL)
+
+		// 存在しないキーにTTLを設定
+		err = cache.Expire(ctx, "non_existent_key", newTTL)
+		assert.NoError(t, err) // Redisは存在しないキーでもエラーを返さない
+	})
+
 	t.Run("should delete key", func(t *testing.T) {
 		key := "test_delete_key"
 		value := "test_delete_value"

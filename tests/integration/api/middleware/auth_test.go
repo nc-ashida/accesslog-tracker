@@ -127,7 +127,7 @@ func TestAuthMiddlewareIntegration(t *testing.T) {
 		}
 
 		_, err := db.Exec(`
-			INSERT INTO applications (app_id, name, description, domain, api_key, active, created_at, updated_at)
+			INSERT INTO applications (app_id, name, description, domain, api_key, is_active, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (app_id) DO NOTHING
 		`, inactiveApp.AppID, inactiveApp.Name, inactiveApp.Description, inactiveApp.Domain, inactiveApp.APIKey, inactiveApp.Active, inactiveApp.CreatedAt, inactiveApp.UpdatedAt)

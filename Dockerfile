@@ -1,5 +1,5 @@
 # ビルドステージ
-FROM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
 
 # 必要なパッケージをインストール
 RUN apk add --no-cache git ca-certificates tzdata
@@ -16,11 +16,16 @@ RUN go mod download
 # ソースコードをコピー
 COPY . .
 
-# アプリケーションをビルド
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/api
+# アプリケーションをビルド（マルチプラットフォーム対応）
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-arm64} go build -a -installsuffix cgo -o main ./cmd/api
 
 # 最終ステージ
-FROM alpine:latest
+FROM --platform=$TARGETPLATFORM alpine:latest
 
 # 必要なパッケージをインストール
 RUN apk --no-cache add ca-certificates tzdata

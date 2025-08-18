@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS applications (
     description TEXT,
     domain VARCHAR(255) NOT NULL,
     api_key VARCHAR(255) UNIQUE NOT NULL,
-    active BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -106,7 +106,7 @@ CREATE TRIGGER update_applications_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- テスト用のサンプルデータを挿入
-INSERT INTO applications (app_id, name, description, domain, api_key, active) VALUES
+INSERT INTO applications (app_id, name, description, domain, api_key, is_active) VALUES
 ('test_app_001', 'Test Application 1', 'Test application for integration testing', 'test1.example.com', 'alt_test_api_key_001', true),
 ('test_app_002', 'Test Application 2', 'Test application for integration testing', 'test2.example.com', 'alt_test_api_key_002', true),
 ('test_app_inactive', 'Inactive Test Application', 'Inactive test application', 'inactive.example.com', 'alt_test_api_key_inactive', false)
